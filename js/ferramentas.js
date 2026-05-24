@@ -15,6 +15,7 @@ await protegerPagina("ferramentas");
 const idEl = document.getElementById("ferramentaId");
 const nomeEl = document.getElementById("nome");
 const diametroEl = document.getElementById("diametro");
+const marcaCompativelEl = document.getElementById("marcaCompativel");
 const xdEl = document.getElementById("xd");
 const comprimentoEl = document.getElementById("comprimento");
 const fabricanteEl = document.getElementById("fabricante");
@@ -30,6 +31,7 @@ document.getElementById("limparBtn").addEventListener("click", () => limparFormu
 async function salvarFerramenta() {
   const nome = nomeEl.value.trim();
   const diametro = Number(diametroEl.value);
+  const marcaCompativel = marcaCompativelEl.value.trim();
   const xd = xdEl.value.trim();
   const comprimento = Number(comprimentoEl.value);
   const fabricante = fabricanteEl.value.trim();
@@ -46,6 +48,11 @@ async function salvarFerramenta() {
     return;
   }
 
+  if (!marcaCompativel) {
+    msgEl.innerHTML = '<div class="alert">Informe a marca compatível do inserto.</div>';
+    return;
+  }
+
   if (!comprimento || comprimento <= 0) {
     msgEl.innerHTML = '<div class="alert">Informe o comprimento útil/configurado.</div>';
     return;
@@ -54,6 +61,7 @@ async function salvarFerramenta() {
   const dados = {
     nome,
     diametro,
+    marcaCompativel,
     xd,
     comprimento,
     fabricante,
@@ -93,8 +101,8 @@ async function carregarFerramentas() {
 
     ferramentas.sort((a, b) => {
       const da = Number(a.diametro || 0);
-      const dbb = Number(b.diametro || 0);
-      if (da !== dbb) return da - dbb;
+      const db = Number(b.diametro || 0);
+      if (da !== db) return da - db;
       return (a.nome || "").localeCompare(b.nome || "");
     });
 
@@ -108,7 +116,7 @@ async function carregarFerramentas() {
         <thead>
           <tr>
             <th>Ferramenta</th>
-            <th>Diâmetro</th>
+            <th>Compatível</th>
             <th>Comprimento</th>
             <th>Status</th>
             <th>Ações</th>
@@ -119,9 +127,12 @@ async function carregarFerramentas() {
             <tr>
               <td>
                 <strong>${f.nome || ""}</strong><br>
-                <small>${f.fabricante || ""} ${f.xd ? "• " + f.xd : ""}</small>
+                <small>${formatarNumero(f.diametro)} mm ${f.xd ? "• " + f.xd : ""}</small>
               </td>
-              <td>${formatarNumero(f.diametro)} mm</td>
+              <td>
+                <strong>${f.marcaCompativel || "-"}</strong><br>
+                <small>${f.fabricante || ""}</small>
+              </td>
               <td>${formatarNumero(f.comprimento)} mm</td>
               <td>${f.ativa ? '<span class="badge">Ativa</span>' : '<span class="badge">Inativa</span>'}</td>
               <td>
@@ -145,6 +156,7 @@ window.editarFerramenta = function(f) {
   idEl.value = f.id;
   nomeEl.value = f.nome || "";
   diametroEl.value = f.diametro || "";
+  marcaCompativelEl.value = f.marcaCompativel || "";
   xdEl.value = f.xd || "";
   comprimentoEl.value = f.comprimento || "";
   fabricanteEl.value = f.fabricante || "";
@@ -170,6 +182,7 @@ function limparFormulario(limparMsg = true) {
   idEl.value = "";
   nomeEl.value = "";
   diametroEl.value = "";
+  marcaCompativelEl.value = "";
   xdEl.value = "";
   comprimentoEl.value = "";
   fabricanteEl.value = "";

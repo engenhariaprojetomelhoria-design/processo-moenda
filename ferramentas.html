@@ -26,7 +26,7 @@
       <section class="topbar">
         <div>
           <h2>Ferramentas</h2>
-          <div>Cadastro das brocas e comprimentos úteis</div>
+          <div>Cadastro das brocas, medidas e compatibilidade com insertos</div>
         </div>
         <div class="user-info">
           <div id="userInfo"></div>
@@ -46,13 +46,16 @@
           <label>Diâmetro da broca (mm)</label>
           <input id="diametro" type="number" step="0.01" placeholder="Ex: 16"/>
 
+          <label>Marca compatível do inserto</label>
+          <input id="marcaCompativel" placeholder="Ex: Iscar, Tungaloy, Kennametal"/>
+
           <label>Relação xD</label>
           <input id="xd" placeholder="Ex: 8xD, 12xD, 16xD"/>
 
           <label>Comprimento útil/configurado (mm)</label>
           <input id="comprimento" type="number" step="0.01" placeholder="Ex: 153"/>
 
-          <label>Fabricante</label>
+          <label>Fabricante da ferramenta</label>
           <input id="fabricante" placeholder="Ex: Kennametal, Iscar, Tungaloy"/>
 
           <label>Status</label>
@@ -72,6 +75,7 @@
 
         <div class="card">
           <h3>Ferramentas cadastradas</h3>
+          <p class="small">O planejamento usará apenas ferramentas ativas e compatíveis com marca/diâmetro do inserto.</p>
           <div id="listaFerramentas">Carregando...</div>
         </div>
       </section>
