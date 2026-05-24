@@ -1,1 +1,83 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Processo Moenda - Insertos</title><link rel="stylesheet" href="css/style.css"/></head><body><div class="app-shell"><aside class="sidebar"><h1>Processo Moenda</h1><div class="subtitle">Controle de ferramentas e insertos</div><nav class="nav"><a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="planejamento.html" data-page="planejamento">Planejamento</a><a href="maquinas.html" data-page="maquinas">Máquinas</a><a href="ferramentas.html" data-page="ferramentas">Ferramentas</a><a href="insertos.html" data-page="insertos">Insertos</a><a href="materiais.html" data-page="materiais">Materiais</a><a href="historico.html" data-page="historico">Histórico</a></nav></aside><main class="main"><section class="topbar"><div><h2>Insertos</h2><div>Cadastrar Iscar, Tungaloy e novas marcas com vida e tolerância.</div></div><div class="user-info"><div id="userInfo"></div><button id="logoutBtn" class="secondary">Sair</button></div></section><section class="card"><h3>Insertos</h3><p>Cadastrar Iscar, Tungaloy e novas marcas com vida e tolerância.</p><p>Esta tela será desenvolvida na próxima etapa.</p></section></main></div><script type="module">import { protegerPagina } from "./js/layout.js"; await protegerPagina("insertos");</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Processo Moenda - Insertos</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <h1>Processo Moenda</h1>
+      <div class="subtitle">Controle de ferramentas e insertos</div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="planejamento.html" data-page="planejamento">Planejamento</a>
+        <a href="maquinas.html" data-page="maquinas">Máquinas</a>
+        <a href="ferramentas.html" data-page="ferramentas">Ferramentas</a>
+        <a href="insertos.html" data-page="insertos">Insertos</a>
+        <a href="materiais.html" data-page="materiais">Materiais</a>
+        <a href="historico.html" data-page="historico">Histórico</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section class="topbar">
+        <div>
+          <h2>Insertos</h2>
+          <div>Cadastro de marcas, vida útil, tolerância e estoque residual</div>
+        </div>
+        <div class="user-info">
+          <div id="userInfo"></div>
+          <button id="logoutBtn" class="secondary">Sair</button>
+        </div>
+      </section>
+
+      <section class="grid grid-2">
+        <div class="card">
+          <h3 id="formTitulo">Adicionar inserto</h3>
+
+          <input id="insertoId" type="hidden"/>
+
+          <label>Marca</label>
+          <input id="marca" placeholder="Ex: Iscar, Tungaloy, Kennametal"/>
+
+          <label>Modelo / Código</label>
+          <input id="modelo" placeholder="Ex: SOMT, LOGU, modelo interno"/>
+
+          <label>Vida segura em metros</label>
+          <input id="vidaSegura" type="number" step="0.01" placeholder="Ex: 100"/>
+
+          <label>Tolerância adicional em metros</label>
+          <input id="tolerancia" type="number" step="0.01" placeholder="Ex: 10"/>
+
+          <label>Estoque residual disponível em metros (opcional)</label>
+          <input id="estoqueResidual" type="number" step="0.01" placeholder="Ex: 12.35"/>
+
+          <label>Status</label>
+          <select id="ativo">
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+
+          <label>Observações</label>
+          <textarea id="observacoes" placeholder="Ex: melhor para nodular, teste de fornecedor, observações internas"></textarea>
+
+          <button id="salvarBtn" class="success">Salvar inserto</button>
+          <button id="limparBtn" class="secondary">Limpar</button>
+
+          <div id="msg"></div>
+        </div>
+
+        <div class="card">
+          <h3>Insertos cadastrados</h3>
+          <div id="listaInsertos">Carregando...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="js/insertos.js"></script>
+</body>
+</html>
