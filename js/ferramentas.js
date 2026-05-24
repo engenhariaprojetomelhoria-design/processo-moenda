@@ -96,11 +96,11 @@ async function carregarFerramentas() {
       ferramentas.push({ id: docSnap.id, ...docSnap.data() });
     });
 
+    // Ordem alfabética principal pelo nome da ferramenta
     ferramentas.sort((a, b) => {
-      const da = Number(a.diametro || 0);
-      const dbb = Number(b.diametro || 0);
-      if (da !== dbb) return da - dbb;
-      return (a.nome || "").localeCompare(b.nome || "");
+      const nomeA = (a.nome || "").toLowerCase();
+      const nomeB = (b.nome || "").toLowerCase();
+      return nomeA.localeCompare(nomeB, "pt-BR");
     });
 
     if (ferramentas.length === 0) {
