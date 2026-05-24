@@ -75,7 +75,11 @@ async function carregarMaquinas() {
       maquinas.push({ id: docSnap.id, ...docSnap.data() });
     });
 
-    maquinas.sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+    maquinas.sort((a, b) => {
+      const nomeA = (a.nome || "").toLowerCase();
+      const nomeB = (b.nome || "").toLowerCase();
+      return nomeA.localeCompare(nomeB, "pt-BR");
+    });
 
     if (maquinas.length === 0) {
       listaEl.innerHTML = "<p>Nenhuma máquina cadastrada.</p>";
