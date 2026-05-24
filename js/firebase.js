@@ -1,9 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDMEJ-rxYUzsJicpI6cbVJHFPKPR8oQPIY",
+  apiKey: "AIzaSyDMEJ-rXYUzSJicpI6cbVJHFPKPR8oQPIY",
   authDomain: "processo-moenda.firebaseapp.com",
   projectId: "processo-moenda",
   storageBucket: "processo-moenda.firebasestorage.app",
@@ -15,16 +15,4 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-export {
-  auth,
-  db,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  doc,
-  getDoc,
-  setDoc,
-  collection,
-  getDocs,
-  serverTimestamp
-};
+export { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, doc, getDoc, setDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp };
