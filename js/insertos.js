@@ -17,11 +17,11 @@ const marcaEl = document.getElementById("marca");
 const modeloEl = document.getElementById("modelo");
 const vidaSeguraEl = document.getElementById("vidaSegura");
 const toleranciaEl = document.getElementById("tolerancia");
-const estoqueResidualEl = document.getElementById("estoqueResidual");
 const ativoEl = document.getElementById("ativo");
 const obsEl = document.getElementById("observacoes");
 const msgEl = document.getElementById("msg");
 const listaEl = document.getElementById("listaInsertos");
+const listaUsadosEl = document.getElementById("listaUsados");
 const tituloEl = document.getElementById("formTitulo");
 
 document.getElementById("salvarBtn").addEventListener("click", salvarInserto);
@@ -32,7 +32,6 @@ async function salvarInserto() {
   const modelo = modeloEl.value.trim();
   const vidaSegura = Number(vidaSeguraEl.value);
   const tolerancia = Number(toleranciaEl.value || 0);
-  const estoqueResidual = Number(estoqueResidualEl.value || 0);
   const ativo = ativoEl.value === "true";
   const observacoes = obsEl.value.trim();
 
@@ -51,20 +50,15 @@ async function salvarInserto() {
     return;
   }
 
-  if (estoqueResidual < 0) {
-    msgEl.innerHTML = '<div class="alert">O estoque residual não pode ser negativo.</div>';
-    return;
-  }
-
   const dados = {
     marca,
     modelo,
     vidaSegura,
     tolerancia,
     vidaTotal: vidaSegura + tolerancia,
-    estoqueResidual,
     ativo,
     observacoes,
+    tipo: "novo",
     atualizadoEm: serverTimestamp()
   };
 
@@ -77,34 +71,46 @@ async function salvarInserto() {
         ...dados,
         criadoEm: serverTimestamp()
       });
-      msgEl.innerHTML = '<div class="ok">Inserto cadastrado com sucesso.</div>';
+      msgEl.innerHTML = '<div class="ok">Inserto novo cadastrado com sucesso.</div>';
     }
 
     limparFormulario(false);
-    await carregarInsertos();
+    await carregarTudo();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao salvar: ${error.message}</div>`;
   }
 }
 
-async function carregarInsertos() {
+async function carregarTudo() {
+  await carregarInsertosNovos();
+  await carregarInsertosUsados();
+}
+
+async function buscarInsertos() {
+  const snap = await getDocs(collection(db, "insertos"));
+  const insertos = [];
+
+  snap.forEach((docSnap) => {
+    insertos.push({ id: docSnap.id, ...docSnap.data() });
+  });
+
+  insertos.sort((a, b) => {
+    const marcaCompare = (a.marca || a.nome || "").localeCompare(b.marca || b.nome || "");
+    if (marcaCompare !== 0) return marcaCompare;
+    return (a.modelo || "").localeCompare(b.modelo || "");
+  });
+
+  return insertos;
+}
+
+async function carregarInsertosNovos() {
   try {
-    const snap = await getDocs(collection(db, "insertos"));
-    const insertos = [];
-
-    snap.forEach((docSnap) => {
-      insertos.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    insertos.sort((a, b) => {
-      const marcaCompare = (a.marca || a.nome || "").localeCompare(b.marca || b.nome || "");
-      if (marcaCompare !== 0) return marcaCompare;
-      return (a.modelo || "").localeCompare(b.modelo || "");
-    });
+    const todos = await buscarInsertos();
+    const insertos = todos.filter(i => i.tipo !== "usado");
 
     if (insertos.length === 0) {
-      listaEl.innerHTML = "<p>Nenhum inserto cadastrado.</p>";
+      listaEl.innerHTML = "<p>Nenhum inserto novo cadastrado.</p>";
       return;
     }
 
@@ -116,7 +122,6 @@ async function carregarInsertos() {
             <th>Vida</th>
             <th>Tolerância</th>
             <th>Total</th>
-            <th>Residual</th>
             <th>Status</th>
             <th>Ações</th>
           </tr>
@@ -127,7 +132,6 @@ async function carregarInsertos() {
             const vidaSegura = Number(i.vidaSegura || 0);
             const tolerancia = Number(i.tolerancia || 0);
             const vidaTotal = Number(i.vidaTotal || (vidaSegura + tolerancia));
-            const estoqueResidual = Number(i.estoqueResidual || 0);
             return `
               <tr>
                 <td>
@@ -137,11 +141,11 @@ async function carregarInsertos() {
                 <td>${formatarNumero(vidaSegura)} m</td>
                 <td>${formatarNumero(tolerancia)} m</td>
                 <td>${formatarNumero(vidaTotal)} m</td>
-                <td>${formatarNumero(estoqueResidual)} m</td>
                 <td>${i.ativo !== false ? '<span class="badge">Ativo</span>' : '<span class="badge">Inativo</span>'}</td>
                 <td>
                   <div class="actions">
                     <button class="secondary" onclick='editarInserto(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Editar</button>
+                    <button class="success" onclick='duplicarUsado(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Duplicar usado</button>
                     <button class="danger" onclick='excluirInserto("${i.id}")'>Excluir</button>
                   </div>
                 </td>
@@ -157,16 +161,124 @@ async function carregarInsertos() {
   }
 }
 
+async function carregarInsertosUsados() {
+  try {
+    const todos = await buscarInsertos();
+    const usados = todos.filter(i => i.tipo === "usado");
+
+    if (usados.length === 0) {
+      listaUsadosEl.innerHTML = "<p>Nenhum inserto usado/residual em estoque.</p>";
+      return;
+    }
+
+    listaUsadosEl.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Inserto usado</th>
+            <th>Residual</th>
+            <th>Origem</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${usados.map(i => `
+            <tr>
+              <td>
+                <strong>${i.marca || ""}</strong><br>
+                <small>${i.modelo || ""}</small>
+              </td>
+              <td><strong>${formatarNumero(i.vidaResidual || 0)} m</strong></td>
+              <td>${i.origem || "-"}</td>
+              <td>${i.ativo !== false ? '<span class="badge">Disponível</span>' : '<span class="badge">Indisponível</span>'}</td>
+              <td>
+                <div class="actions">
+                  <button class="secondary" onclick='editarUsado(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Editar residual</button>
+                  <button class="danger" onclick='excluirInserto("${i.id}")'>Excluir</button>
+                </div>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    console.error(error);
+    listaUsadosEl.innerHTML = `<div class="alert">Erro ao carregar estoque usado: ${error.message}</div>`;
+  }
+}
+
+window.duplicarUsado = async function(i) {
+  const residualTexto = prompt(`Residual disponível para ${i.marca || i.nome} ${i.modelo || ""} (em metros):`);
+  if (residualTexto === null) return;
+
+  const vidaResidual = Number(String(residualTexto).replace(",", "."));
+
+  if (!vidaResidual || vidaResidual <= 0) {
+    alert("Informe um residual válido maior que zero.");
+    return;
+  }
+
+  const origem = prompt("Origem/observação deste usado (opcional):", "Estoque residual") || "";
+
+  try {
+    await addDoc(collection(db, "insertos"), {
+      marca: i.marca || i.nome || "",
+      modelo: i.modelo || "",
+      vidaSegura: i.vidaSegura || 0,
+      tolerancia: i.tolerancia || 0,
+      vidaTotal: i.vidaTotal || ((Number(i.vidaSegura || 0)) + (Number(i.tolerancia || 0))),
+      vidaResidual,
+      origem,
+      tipo: "usado",
+      ativo: true,
+      observacoes: i.observacoes || "",
+      insertoBaseId: i.id,
+      criadoEm: serverTimestamp(),
+      atualizadoEm: serverTimestamp()
+    });
+
+    await carregarTudo();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao duplicar usado: " + error.message);
+  }
+};
+
+window.editarUsado = async function(i) {
+  const residualTexto = prompt(`Novo residual disponível para ${i.marca || ""} ${i.modelo || ""}:`, i.vidaResidual || "");
+  if (residualTexto === null) return;
+
+  const vidaResidual = Number(String(residualTexto).replace(",", "."));
+
+  if (!vidaResidual || vidaResidual <= 0) {
+    alert("Informe um residual válido maior que zero.");
+    return;
+  }
+
+  try {
+    await updateDoc(doc(db, "insertos", i.id), {
+      vidaResidual,
+      atualizadoEm: serverTimestamp()
+    });
+
+    await carregarTudo();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao editar residual: " + error.message);
+  }
+};
+
 window.editarInserto = function(i) {
   idEl.value = i.id;
   marcaEl.value = i.marca || i.nome || "";
   modeloEl.value = i.modelo || "";
   vidaSeguraEl.value = i.vidaSegura || "";
   toleranciaEl.value = i.tolerancia || "";
-  estoqueResidualEl.value = i.estoqueResidual || "";
   ativoEl.value = String(i.ativo !== false);
   obsEl.value = i.observacoes || "";
-  tituloEl.textContent = "Editar inserto";
+  tituloEl.textContent = "Editar inserto novo";
   msgEl.innerHTML = "";
 };
 
@@ -175,7 +287,7 @@ window.excluirInserto = async function(id) {
 
   try {
     await deleteDoc(doc(db, "insertos", id));
-    await carregarInsertos();
+    await carregarTudo();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao excluir: ${error.message}</div>`;
@@ -188,10 +300,9 @@ function limparFormulario(limparMsg = true) {
   modeloEl.value = "";
   vidaSeguraEl.value = "";
   toleranciaEl.value = "";
-  estoqueResidualEl.value = "";
   ativoEl.value = "true";
   obsEl.value = "";
-  tituloEl.textContent = "Adicionar inserto";
+  tituloEl.textContent = "Adicionar inserto novo";
 
   if (limparMsg) {
     msgEl.innerHTML = "";
@@ -206,4 +317,4 @@ function formatarNumero(valor) {
   });
 }
 
-await carregarInsertos();
+await carregarTudo();
