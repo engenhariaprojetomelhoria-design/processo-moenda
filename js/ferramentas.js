@@ -138,6 +138,7 @@ async function carregarFerramentas() {
               <td>
                 <div class="actions">
                   <button class="secondary" onclick='editarFerramenta(${JSON.stringify(f).replace(/'/g, "&apos;")})'>Editar</button>
+                  <button class="success" onclick='duplicarFerramenta(${JSON.stringify(f).replace(/'/g, "&apos;")})'>Duplicar</button>
                   <button class="danger" onclick='excluirFerramenta("${f.id}")'>Excluir</button>
                 </div>
               </td>
@@ -164,6 +165,21 @@ window.editarFerramenta = function(f) {
   obsEl.value = f.observacoes || "";
   tituloEl.textContent = "Editar ferramenta";
   msgEl.innerHTML = "";
+};
+
+window.duplicarFerramenta = function(f) {
+  idEl.value = "";
+  nomeEl.value = f.nome || "";
+  diametroEl.value = f.diametro || "";
+  marcaCompativelEl.value = "";
+  xdEl.value = f.xd || "";
+  comprimentoEl.value = f.comprimento || "";
+  fabricanteEl.value = f.fabricante || "";
+  ativaEl.value = String(f.ativa !== false);
+  obsEl.value = f.observacoes || "";
+  tituloEl.textContent = "Duplicar ferramenta";
+  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Informe a nova marca compatível e clique em Salvar.</div>';
+  marcaCompativelEl.focus();
 };
 
 window.excluirFerramenta = async function(id) {
