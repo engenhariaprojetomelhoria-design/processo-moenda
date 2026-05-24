@@ -27,7 +27,23 @@ const tituloEl = document.getElementById("formTitulo");
 document.getElementById("salvarBtn").addEventListener("click", salvarFerramenta);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
 
+function atualizarNomeAutomatico() {
+  const fabricante = fabricanteEl.value.trim();
+  const diametro = diametroEl.value.trim();
+  const xd = xdEl.value.trim();
+
+  if (!fabricante || !diametro || !xd) return;
+
+  nomeEl.value = `${fabricante} ${diametro} — ${xd}`;
+}
+
+fabricanteEl.addEventListener("input", atualizarNomeAutomatico);
+diametroEl.addEventListener("input", atualizarNomeAutomatico);
+xdEl.addEventListener("input", atualizarNomeAutomatico);
+
 async function salvarFerramenta() {
+  atualizarNomeAutomatico();
+
   const nome = nomeEl.value.trim();
   const diametro = Number(diametroEl.value);
   const xd = xdEl.value.trim();
@@ -96,7 +112,6 @@ async function carregarFerramentas() {
       ferramentas.push({ id: docSnap.id, ...docSnap.data() });
     });
 
-    // Ordem alfabética principal pelo nome da ferramenta
     ferramentas.sort((a, b) => {
       const nomeA = (a.nome || "").toLowerCase();
       const nomeB = (b.nome || "").toLowerCase();
@@ -170,8 +185,7 @@ window.duplicarFerramenta = function(f) {
   ativaEl.value = String(f.ativa !== false);
   obsEl.value = f.observacoes || "";
   tituloEl.textContent = "Duplicar ferramenta";
-  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Ajuste o fabricante ou outros dados e clique em Salvar.</div>';
-  fabricanteEl.focus();
+  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário.</div>';
 };
 
 window.excluirFerramenta = async function(id) {
