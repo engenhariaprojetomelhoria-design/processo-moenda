@@ -71,7 +71,7 @@ async function salvarInserto() {
         ...dados,
         criadoEm: serverTimestamp()
       });
-      msgEl.innerHTML = '<div class="ok">Inserto novo cadastrado com sucesso.</div>';
+      msgEl.innerHTML = '<div class="ok">Inserto cadastrado com sucesso.</div>';
     }
 
     limparFormulario(false);
@@ -82,12 +82,7 @@ async function salvarInserto() {
   }
 }
 
-async function carregarTudo() {
-  await carregarInsertosNovos();
-  await carregarInsertosUsados();
-}
-
-async function buscarInsertos() {
+async function carregarTodosInsertos() {
   const snap = await getDocs(collection(db, "insertos"));
   const insertos = [];
 
@@ -96,7 +91,9 @@ async function buscarInsertos() {
   });
 
   insertos.sort((a, b) => {
-    const marcaCompare = (a.marca || a.nome || "").localeCompare(b.marca || b.nome || "");
+    const marcaA = a.marca || a.nome || "";
+    const marcaB = b.marca || b.nome || "";
+    const marcaCompare = marcaA.localeCompare(marcaB);
     if (marcaCompare !== 0) return marcaCompare;
     return (a.modelo || "").localeCompare(b.modelo || "");
   });
@@ -104,113 +101,113 @@ async function buscarInsertos() {
   return insertos;
 }
 
-async function carregarInsertosNovos() {
+async function carregarTudo() {
   try {
-    const todos = await buscarInsertos();
-    const insertos = todos.filter(i => i.tipo !== "usado");
+    const todos = await carregarTodosInsertos();
 
-    if (insertos.length === 0) {
-      listaEl.innerHTML = "<p>Nenhum inserto novo cadastrado.</p>";
-      return;
-    }
+    const novos = todos.filter(i => i.tipo !== "usado");
+    const usados = todos.filter(i => i.tipo === "usado");
 
-    listaEl.innerHTML = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Inserto</th>
-            <th>Vida</th>
-            <th>Tolerância</th>
-            <th>Total</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${insertos.map(i => {
-            const marca = i.marca || i.nome || "";
-            const vidaSegura = Number(i.vidaSegura || 0);
-            const tolerancia = Number(i.tolerancia || 0);
-            const vidaTotal = Number(i.vidaTotal || (vidaSegura + tolerancia));
-            return `
-              <tr>
-                <td>
-                  <strong>${marca}</strong><br>
-                  <small>${i.modelo || ""}</small>
-                </td>
-                <td>${formatarNumero(vidaSegura)} m</td>
-                <td>${formatarNumero(tolerancia)} m</td>
-                <td>${formatarNumero(vidaTotal)} m</td>
-                <td>${i.ativo !== false ? '<span class="badge">Ativo</span>' : '<span class="badge">Inativo</span>'}</td>
-                <td>
-                  <div class="actions">
-                    <button class="secondary" onclick='editarInserto(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Editar</button>
-                    <button class="success" onclick='duplicarUsado(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Duplicar usado</button>
-                    <button class="danger" onclick='excluirInserto("${i.id}")'>Excluir</button>
-                  </div>
-                </td>
-              </tr>
-            `;
-          }).join("")}
-        </tbody>
-      </table>
-    `;
+    renderNovos(novos);
+    renderUsados(usados);
   } catch (error) {
     console.error(error);
     listaEl.innerHTML = `<div class="alert">Erro ao carregar insertos: ${error.message}</div>`;
+    listaUsadosEl.innerHTML = `<div class="alert">Erro ao carregar estoque: ${error.message}</div>`;
   }
 }
 
-async function carregarInsertosUsados() {
-  try {
-    const todos = await buscarInsertos();
-    const usados = todos.filter(i => i.tipo === "usado");
+function renderNovos(insertos) {
+  if (insertos.length === 0) {
+    listaEl.innerHTML = "<p>Nenhum inserto cadastrado.</p>";
+    return;
+  }
 
-    if (usados.length === 0) {
-      listaUsadosEl.innerHTML = "<p>Nenhum inserto usado/residual em estoque.</p>";
-      return;
-    }
-
-    listaUsadosEl.innerHTML = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Inserto usado</th>
-            <th>Residual</th>
-            <th>Origem</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${usados.map(i => `
+  listaEl.innerHTML = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Inserto</th>
+          <th>Vida</th>
+          <th>Tolerância</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${insertos.map(i => {
+          const marca = i.marca || i.nome || "";
+          const vidaSegura = Number(i.vidaSegura || 0);
+          const tolerancia = Number(i.tolerancia || 0);
+          const vidaTotal = Number(i.vidaTotal || (vidaSegura + tolerancia));
+          return `
             <tr>
               <td>
-                <strong>${i.marca || ""}</strong><br>
+                <strong>${marca}</strong><br>
                 <small>${i.modelo || ""}</small>
               </td>
-              <td><strong>${formatarNumero(i.vidaResidual || 0)} m</strong></td>
-              <td>${i.origem || "-"}</td>
-              <td>${i.ativo !== false ? '<span class="badge">Disponível</span>' : '<span class="badge">Indisponível</span>'}</td>
+              <td>${formatarNumero(vidaSegura)} m</td>
+              <td>${formatarNumero(tolerancia)} m</td>
+              <td>${formatarNumero(vidaTotal)} m</td>
+              <td>${i.ativo !== false ? '<span class="badge">Ativo</span>' : '<span class="badge">Inativo</span>'}</td>
               <td>
                 <div class="actions">
-                  <button class="secondary" onclick='editarUsado(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Editar residual</button>
+                  <button class="secondary" onclick='editarInserto(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Editar</button>
+                  <button class="success" onclick='duplicarUsado(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Duplicar usado</button>
                   <button class="danger" onclick='excluirInserto("${i.id}")'>Excluir</button>
                 </div>
               </td>
             </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
-  } catch (error) {
-    console.error(error);
-    listaUsadosEl.innerHTML = `<div class="alert">Erro ao carregar estoque usado: ${error.message}</div>`;
+          `;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderUsados(usados) {
+  if (usados.length === 0) {
+    listaUsadosEl.innerHTML = "<p>Nenhum inserto usado em estoque.</p>";
+    return;
   }
+
+  listaUsadosEl.innerHTML = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Inserto usado</th>
+          <th>Residual</th>
+          <th>Origem</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${usados.map(i => `
+          <tr>
+            <td>
+              <strong>${i.marca || ""}</strong><br>
+              <small>${i.modelo || ""}</small>
+            </td>
+            <td>${formatarNumero(i.vidaResidual || 0)} m</td>
+            <td>${i.origem || "-"}</td>
+            <td>${i.ativo !== false ? '<span class="badge">Disponível</span>' : '<span class="badge">Indisponível</span>'}</td>
+            <td>
+              <div class="actions">
+                <button class="secondary" onclick='editarResidual(${JSON.stringify(i).replace(/'/g, "&apos;")})'>Editar residual</button>
+                <button class="danger" onclick='excluirInserto("${i.id}")'>Excluir</button>
+              </div>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
 }
 
 window.duplicarUsado = async function(i) {
-  const residualTexto = prompt(`Residual disponível para ${i.marca || i.nome} ${i.modelo || ""} (em metros):`);
+  const residualTexto = prompt(`Residual disponível para ${i.marca || i.nome} ${i.modelo || ""} em metros:`);
   if (residualTexto === null) return;
 
   const vidaResidual = Number(String(residualTexto).replace(",", "."));
@@ -220,21 +217,21 @@ window.duplicarUsado = async function(i) {
     return;
   }
 
-  const origem = prompt("Origem/observação deste usado (opcional):", "Estoque residual") || "";
+  const origem = prompt("Origem/observação deste inserto usado:", "Estoque residual") || "";
 
   try {
     await addDoc(collection(db, "insertos"), {
       marca: i.marca || i.nome || "",
       modelo: i.modelo || "",
-      vidaSegura: i.vidaSegura || 0,
-      tolerancia: i.tolerancia || 0,
-      vidaTotal: i.vidaTotal || ((Number(i.vidaSegura || 0)) + (Number(i.tolerancia || 0))),
+      vidaSegura: Number(i.vidaSegura || 0),
+      tolerancia: Number(i.tolerancia || 0),
+      vidaTotal: Number(i.vidaTotal || ((Number(i.vidaSegura || 0)) + (Number(i.tolerancia || 0)))),
       vidaResidual,
       origem,
       tipo: "usado",
       ativo: true,
-      observacoes: i.observacoes || "",
       insertoBaseId: i.id,
+      observacoes: i.observacoes || "",
       criadoEm: serverTimestamp(),
       atualizadoEm: serverTimestamp()
     });
@@ -246,7 +243,7 @@ window.duplicarUsado = async function(i) {
   }
 };
 
-window.editarUsado = async function(i) {
+window.editarResidual = async function(i) {
   const residualTexto = prompt(`Novo residual disponível para ${i.marca || ""} ${i.modelo || ""}:`, i.vidaResidual || "");
   if (residualTexto === null) return;
 
@@ -278,7 +275,7 @@ window.editarInserto = function(i) {
   toleranciaEl.value = i.tolerancia || "";
   ativoEl.value = String(i.ativo !== false);
   obsEl.value = i.observacoes || "";
-  tituloEl.textContent = "Editar inserto novo";
+  tituloEl.textContent = "Editar inserto";
   msgEl.innerHTML = "";
 };
 
@@ -302,7 +299,7 @@ function limparFormulario(limparMsg = true) {
   toleranciaEl.value = "";
   ativoEl.value = "true";
   obsEl.value = "";
-  tituloEl.textContent = "Adicionar inserto novo";
+  tituloEl.textContent = "Adicionar inserto";
 
   if (limparMsg) {
     msgEl.innerHTML = "";

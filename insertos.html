@@ -26,7 +26,7 @@
       <section class="topbar">
         <div>
           <h2>Insertos</h2>
-          <div>Cadastro de insertos novos e estoque de usados/residuais</div>
+          <div>Cadastro de marcas, vida útil, tolerância e estoque residual</div>
         </div>
         <div class="user-info">
           <div id="userInfo"></div>
@@ -36,7 +36,7 @@
 
       <section class="grid grid-2">
         <div class="card">
-          <h3 id="formTitulo">Adicionar inserto novo</h3>
+          <h3 id="formTitulo">Adicionar inserto</h3>
 
           <input id="insertoId" type="hidden"/>
 
@@ -61,22 +61,21 @@
           <label>Observações</label>
           <textarea id="observacoes" placeholder="Ex: melhor para nodular, teste de fornecedor, observações internas"></textarea>
 
-          <button id="salvarBtn" class="success">Salvar inserto novo</button>
+          <button id="salvarBtn" class="success">Salvar inserto</button>
           <button id="limparBtn" class="secondary">Limpar</button>
 
           <div id="msg"></div>
         </div>
 
         <div class="card">
-          <h3>Insertos novos cadastrados</h3>
-          <p class="small">Use o botão “Duplicar usado” para lançar uma sobra no estoque residual.</p>
+          <h3>Insertos cadastrados</h3>
           <div id="listaInsertos">Carregando...</div>
         </div>
       </section>
 
       <section class="card">
-        <h3>Estoque de insertos usados / residuais</h3>
-        <p class="small">Esses itens representam sobras aproveitáveis e devem ter prioridade no planejamento antes de usar inserto novo.</p>
+        <h3>Estoque de insertos usados</h3>
+        <p class="small">Use “Duplicar usado” em um inserto cadastrado para lançar uma sobra residual.</p>
         <div id="listaUsados">Carregando...</div>
       </section>
     </main>
