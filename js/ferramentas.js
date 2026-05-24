@@ -15,7 +15,6 @@ await protegerPagina("ferramentas");
 const idEl = document.getElementById("ferramentaId");
 const nomeEl = document.getElementById("nome");
 const diametroEl = document.getElementById("diametro");
-const marcaCompativelEl = document.getElementById("marcaCompativel");
 const xdEl = document.getElementById("xd");
 const comprimentoEl = document.getElementById("comprimento");
 const fabricanteEl = document.getElementById("fabricante");
@@ -31,7 +30,6 @@ document.getElementById("limparBtn").addEventListener("click", () => limparFormu
 async function salvarFerramenta() {
   const nome = nomeEl.value.trim();
   const diametro = Number(diametroEl.value);
-  const marcaCompativel = marcaCompativelEl.value.trim();
   const xd = xdEl.value.trim();
   const comprimento = Number(comprimentoEl.value);
   const fabricante = fabricanteEl.value.trim();
@@ -48,20 +46,19 @@ async function salvarFerramenta() {
     return;
   }
 
-  if (!marcaCompativel) {
-    msgEl.innerHTML = '<div class="alert">Informe a marca compatível do inserto.</div>';
+  if (!comprimento || comprimento <= 0) {
+    msgEl.innerHTML = '<div class="alert">Informe o comprimento útil/configurado.</div>';
     return;
   }
 
-  if (!comprimento || comprimento <= 0) {
-    msgEl.innerHTML = '<div class="alert">Informe o comprimento útil/configurado.</div>';
+  if (!fabricante) {
+    msgEl.innerHTML = '<div class="alert">Informe o fabricante da ferramenta.</div>';
     return;
   }
 
   const dados = {
     nome,
     diametro,
-    marcaCompativel,
     xd,
     comprimento,
     fabricante,
@@ -101,8 +98,8 @@ async function carregarFerramentas() {
 
     ferramentas.sort((a, b) => {
       const da = Number(a.diametro || 0);
-      const db = Number(b.diametro || 0);
-      if (da !== db) return da - db;
+      const dbb = Number(b.diametro || 0);
+      if (da !== dbb) return da - dbb;
       return (a.nome || "").localeCompare(b.nome || "");
     });
 
@@ -116,7 +113,7 @@ async function carregarFerramentas() {
         <thead>
           <tr>
             <th>Ferramenta</th>
-            <th>Compatível</th>
+            <th>Fabricante</th>
             <th>Comprimento</th>
             <th>Status</th>
             <th>Ações</th>
@@ -129,10 +126,7 @@ async function carregarFerramentas() {
                 <strong>${f.nome || ""}</strong><br>
                 <small>${formatarNumero(f.diametro)} mm ${f.xd ? "• " + f.xd : ""}</small>
               </td>
-              <td>
-                <strong>${f.marcaCompativel || "-"}</strong><br>
-                <small>${f.fabricante || ""}</small>
-              </td>
+              <td><strong>${f.fabricante || "-"}</strong></td>
               <td>${formatarNumero(f.comprimento)} mm</td>
               <td>${f.ativa ? '<span class="badge">Ativa</span>' : '<span class="badge">Inativa</span>'}</td>
               <td>
@@ -157,7 +151,6 @@ window.editarFerramenta = function(f) {
   idEl.value = f.id;
   nomeEl.value = f.nome || "";
   diametroEl.value = f.diametro || "";
-  marcaCompativelEl.value = f.marcaCompativel || "";
   xdEl.value = f.xd || "";
   comprimentoEl.value = f.comprimento || "";
   fabricanteEl.value = f.fabricante || "";
@@ -171,15 +164,14 @@ window.duplicarFerramenta = function(f) {
   idEl.value = "";
   nomeEl.value = f.nome || "";
   diametroEl.value = f.diametro || "";
-  marcaCompativelEl.value = "";
   xdEl.value = f.xd || "";
   comprimentoEl.value = f.comprimento || "";
   fabricanteEl.value = f.fabricante || "";
   ativaEl.value = String(f.ativa !== false);
   obsEl.value = f.observacoes || "";
   tituloEl.textContent = "Duplicar ferramenta";
-  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Informe a nova marca compatível e clique em Salvar.</div>';
-  marcaCompativelEl.focus();
+  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Ajuste o fabricante ou outros dados e clique em Salvar.</div>';
+  fabricanteEl.focus();
 };
 
 window.excluirFerramenta = async function(id) {
@@ -198,7 +190,6 @@ function limparFormulario(limparMsg = true) {
   idEl.value = "";
   nomeEl.value = "";
   diametroEl.value = "";
-  marcaCompativelEl.value = "";
   xdEl.value = "";
   comprimentoEl.value = "";
   fabricanteEl.value = "";
