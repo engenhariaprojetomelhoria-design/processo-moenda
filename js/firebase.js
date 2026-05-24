@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
+  apiKey: "AIzaSyDMEJ-rxYUzsJicpI6cbVJHFPKPR8oQPIY",
   authDomain: "processo-moenda.firebaseapp.com",
   projectId: "processo-moenda",
   storageBucket: "processo-moenda.firebasestorage.app",
