@@ -31,7 +31,9 @@ document.getElementById("salvarBtn").addEventListener("click", salvarInserto);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
 
 criarPainelReversao();
-{
+await carregarFabricantesFerramentas();
+
+async function carregarFabricantesFerramentas() {
   const snap = await getDocs(collection(db, "ferramentas"));
   const fabricantes = new Set();
   const diametros = new Set();
@@ -39,34 +41,20 @@ criarPainelReversao();
   snap.forEach((docSnap) => {
     const f = docSnap.data();
 
-    if (f.fabricante) {
-      fabricantes.add(String(f.fabricante).trim());
-    }
-
-    const diametroFerramenta = Number(
-      f.diametro || f.diametroBroca || f.bitola || 0
-    );
-
-    if (diametroFerramenta > 0) {
-      diametros.add(diametroFerramenta);
-    }
+    if (f.fabricante) fabricantes.add(f.fabricante.trim());
+    if (f.diametro) diametros.add(Number(f.diametro));
   });
 
-  const listaFabricantes = Array.from(fabricantes)
-    .sort((a, b) => a.localeCompare(b, "pt-BR"));
-
-  const listaDiametros = Array.from(diametros)
-    .sort((a, b) => a - b);
+  const listaFabricantes = Array.from(fabricantes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const listaDiametros = Array.from(diametros).sort((a, b) => a - b);
 
   marcaEl.innerHTML = listaFabricantes.length
-    ? '<option value="">Selecione o fabricante</option>' +
-      listaFabricantes.map(f => `<option value="${f}">${f}</option>`).join("")
+    ? '<option value="">Selecione o fabricante</option>' + listaFabricantes.map(f => `<option value="${f}">${f}</option>`).join("")
     : '<option value="">Cadastre uma ferramenta primeiro</option>';
 
   diametroEl.innerHTML = listaDiametros.length
-    ? '<option value="">Selecione o diâmetro</option>' +
-      listaDiametros.map(d => `<option value="${d}">Ø ${d} mm</option>`).join("")
-    : '<option value="">Nenhum diâmetro encontrado</option>';
+    ? '<option value="">Selecione o diâmetro</option>' + listaDiametros.map(d => `<option value="${d}">Ø ${d} mm</option>`).join("")
+    : '<option value="">Cadastre uma ferramenta primeiro</option>';
 }
 
 async function salvarInserto() {
@@ -499,5 +487,4 @@ async function reverterUltimaAlteracao() {
   }
 }
 
-await carregarFabricantesFerramentas();
 await carregarTudo();
