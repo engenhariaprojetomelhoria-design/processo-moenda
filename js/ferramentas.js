@@ -5,6 +5,8 @@ import {
   addDoc,
   getDocs,
   doc,
+  getDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   serverTimestamp
@@ -27,6 +29,8 @@ const tituloEl = document.getElementById("formTitulo");
 document.getElementById("salvarBtn").addEventListener("click", salvarFerramenta);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
 
+criarPainelReversoes();
+
 function atualizarNomeAutomatico() {
   const fabricante = fabricanteEl.value.trim();
   const diametro = diametroEl.value.trim();
@@ -43,7 +47,6 @@ xdEl.addEventListener("input", atualizarNomeAutomatico);
 
 async function salvarFerramenta() {
   atualizarNomeAutomatico();
-
   const nome = nomeEl.value.trim();
   const diametro = Number(diametroEl.value);
   const xd = xdEl.value.trim();
@@ -85,7 +88,21 @@ async function salvarFerramenta() {
 
   try {
     if (idEl.value) {
-      await updateDoc(doc(db, "ferramentas", idEl.value), dados);
+      const ref = doc(db, "ferramentas", idEl.value);
+      const snapAntes = await getDoc(ref);
+      const dadosAntes = snapAntes.exists() ? snapAntes.data() : null;
+
+      await updateDoc(ref, dados);
+
+      await registrarReversao({
+        modulo: "ferramentas",
+        acao: "editar",
+        documentoId: idEl.value,
+        descricao: `Ferramenta editada: ${dadosAntes?.nome || nome}`,
+        dadosAntes,
+        dadosDepois: dados
+      });
+
       msgEl.innerHTML = '<div class="ok">Ferramenta atualizada com sucesso.</div>';
     } else {
       await addDoc(collection(db, "ferramentas"), {
@@ -96,7 +113,185 @@ async function salvarFerramenta() {
     }
 
     limparFormulario(false);
+    
+/* ==============================
+   REVERSÕES - ÚLTIMAS 5 ALTERAÇÕES
+   ============================== */
+
+function criarPainelReversoes() {
+  if (document.getElementById("listaReversoesFerramentas")) return;
+
+  const painel = document.createElement("section");
+  painel.className = "card";
+  painel.innerHTML = `
+    <h3>Últimas alterações</h3>
+    <p>Permite reverter as últimas 5 alterações feitas em ferramentas.</p>
+    <div id="listaReversoesFerramentas">Carregando...</div>
+  `;
+
+  const main = document.querySelector(".main");
+  if (main) {
+    main.appendChild(painel);
+  }
+}
+
+async function registrarReversao({ modulo, acao, documentoId, descricao, dadosAntes, dadosDepois }) {
+  if (!dadosAntes) return;
+
+  await addDoc(collection(db, "reversoes"), {
+    modulo,
+    acao,
+    documentoId,
+    descricao,
+    dadosAntes,
+    dadosDepois,
+    status: "disponivel",
+    criadoEm: serverTimestamp()
+  });
+
+  await limitarReversoesFerramentas();
+}
+
+async function limitarReversoesFerramentas() {
+  const snap = await getDocs(collection(db, "reversoes"));
+  const reversoes = [];
+
+  snap.forEach((docSnap) => {
+    const r = { id: docSnap.id, ...docSnap.data() };
+    if (r.modulo === "ferramentas" && r.status === "disponivel") {
+      reversoes.push(r);
+    }
+  });
+
+  reversoes.sort((a, b) => {
+    const ta = a.criadoEm?.seconds || 0;
+    const tb = b.criadoEm?.seconds || 0;
+    return tb - ta;
+  });
+
+  const excedentes = reversoes.slice(5);
+
+  for (const item of excedentes) {
+    await updateDoc(doc(db, "reversoes", item.id), {
+      status: "expirado"
+    });
+  }
+}
+
+async function carregarReversoes() {
+  const el = document.getElementById("listaReversoesFerramentas");
+  if (!el) return;
+
+  try {
+    const snap = await getDocs(collection(db, "reversoes"));
+    const reversoes = [];
+
+    snap.forEach((docSnap) => {
+      const r = { id: docSnap.id, ...docSnap.data() };
+      if (r.modulo === "ferramentas" && r.status === "disponivel") {
+        reversoes.push(r);
+      }
+    });
+
+    reversoes.sort((a, b) => {
+      const ta = a.criadoEm?.seconds || 0;
+      const tb = b.criadoEm?.seconds || 0;
+      return tb - ta;
+    });
+
+    const ultimas = reversoes.slice(0, 5);
+
+    if (ultimas.length === 0) {
+      el.innerHTML = "<p>Nenhuma alteração disponível para reversão.</p>";
+      return;
+    }
+
+    el.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Alteração</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ultimas.map(r => `
+            <tr>
+              <td>
+                <strong>${r.descricao || "Alteração"}</strong><br>
+                <small>${r.acao || ""}</small>
+              </td>
+              <td>
+                <button class="secondary" onclick='reverterAlteracao("${r.id}")'>Reverter</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    console.error(error);
+    el.innerHTML = `<div class="alert">Erro ao carregar reversões: ${error.message}</div>`;
+  }
+}
+
+window.reverterAlteracao = async function(reversaoId) {
+  if (!confirm("Deseja reverter esta alteração?")) return;
+
+  try {
+    const refReversao = doc(db, "reversoes", reversaoId);
+    const snap = await getDoc(refReversao);
+
+    if (!snap.exists()) {
+      alert("Reversão não encontrada.");
+      return;
+    }
+
+    const reversao = snap.data();
+
+    if (reversao.status !== "disponivel") {
+      alert("Essa reversão não está mais disponível.");
+      return;
+    }
+
+    if (reversao.modulo !== "ferramentas") {
+      alert("Essa reversão não pertence a ferramentas.");
+      return;
+    }
+
+    const refDoc = doc(db, "ferramentas", reversao.documentoId);
+
+    if (reversao.acao === "editar") {
+      await updateDoc(refDoc, {
+        ...reversao.dadosAntes,
+        atualizadoEm: serverTimestamp()
+      });
+    }
+
+    if (reversao.acao === "excluir") {
+      await setDoc(refDoc, {
+        ...reversao.dadosAntes,
+        restauradoEm: serverTimestamp()
+      });
+    }
+
+    await updateDoc(refReversao, {
+      status: "revertido",
+      revertidoEm: serverTimestamp()
+    });
+
     await carregarFerramentas();
+    await carregarReversoes();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao reverter: " + error.message);
+  }
+};
+
+
+await carregarFerramentas();
+await carregarReversoes();
+    await carregarReversoes();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao salvar: ${error.message}</div>`;
@@ -112,6 +307,7 @@ async function carregarFerramentas() {
       ferramentas.push({ id: docSnap.id, ...docSnap.data() });
     });
 
+    // Ordem alfabética principal pelo nome da ferramenta
     ferramentas.sort((a, b) => {
       const nomeA = (a.nome || "").toLowerCase();
       const nomeB = (b.nome || "").toLowerCase();
@@ -185,7 +381,8 @@ window.duplicarFerramenta = function(f) {
   ativaEl.value = String(f.ativa !== false);
   obsEl.value = f.observacoes || "";
   tituloEl.textContent = "Duplicar ferramenta";
-  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário.</div>';
+  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Ajuste o fabricante ou outros dados e clique em Salvar.</div>';
+  fabricanteEl.focus();
 };
 
 window.excluirFerramenta = async function(id) {
@@ -193,7 +390,185 @@ window.excluirFerramenta = async function(id) {
 
   try {
     await deleteDoc(doc(db, "ferramentas", id));
+    
+/* ==============================
+   REVERSÕES - ÚLTIMAS 5 ALTERAÇÕES
+   ============================== */
+
+function criarPainelReversoes() {
+  if (document.getElementById("listaReversoesFerramentas")) return;
+
+  const painel = document.createElement("section");
+  painel.className = "card";
+  painel.innerHTML = `
+    <h3>Últimas alterações</h3>
+    <p>Permite reverter as últimas 5 alterações feitas em ferramentas.</p>
+    <div id="listaReversoesFerramentas">Carregando...</div>
+  `;
+
+  const main = document.querySelector(".main");
+  if (main) {
+    main.appendChild(painel);
+  }
+}
+
+async function registrarReversao({ modulo, acao, documentoId, descricao, dadosAntes, dadosDepois }) {
+  if (!dadosAntes) return;
+
+  await addDoc(collection(db, "reversoes"), {
+    modulo,
+    acao,
+    documentoId,
+    descricao,
+    dadosAntes,
+    dadosDepois,
+    status: "disponivel",
+    criadoEm: serverTimestamp()
+  });
+
+  await limitarReversoesFerramentas();
+}
+
+async function limitarReversoesFerramentas() {
+  const snap = await getDocs(collection(db, "reversoes"));
+  const reversoes = [];
+
+  snap.forEach((docSnap) => {
+    const r = { id: docSnap.id, ...docSnap.data() };
+    if (r.modulo === "ferramentas" && r.status === "disponivel") {
+      reversoes.push(r);
+    }
+  });
+
+  reversoes.sort((a, b) => {
+    const ta = a.criadoEm?.seconds || 0;
+    const tb = b.criadoEm?.seconds || 0;
+    return tb - ta;
+  });
+
+  const excedentes = reversoes.slice(5);
+
+  for (const item of excedentes) {
+    await updateDoc(doc(db, "reversoes", item.id), {
+      status: "expirado"
+    });
+  }
+}
+
+async function carregarReversoes() {
+  const el = document.getElementById("listaReversoesFerramentas");
+  if (!el) return;
+
+  try {
+    const snap = await getDocs(collection(db, "reversoes"));
+    const reversoes = [];
+
+    snap.forEach((docSnap) => {
+      const r = { id: docSnap.id, ...docSnap.data() };
+      if (r.modulo === "ferramentas" && r.status === "disponivel") {
+        reversoes.push(r);
+      }
+    });
+
+    reversoes.sort((a, b) => {
+      const ta = a.criadoEm?.seconds || 0;
+      const tb = b.criadoEm?.seconds || 0;
+      return tb - ta;
+    });
+
+    const ultimas = reversoes.slice(0, 5);
+
+    if (ultimas.length === 0) {
+      el.innerHTML = "<p>Nenhuma alteração disponível para reversão.</p>";
+      return;
+    }
+
+    el.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Alteração</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ultimas.map(r => `
+            <tr>
+              <td>
+                <strong>${r.descricao || "Alteração"}</strong><br>
+                <small>${r.acao || ""}</small>
+              </td>
+              <td>
+                <button class="secondary" onclick='reverterAlteracao("${r.id}")'>Reverter</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    console.error(error);
+    el.innerHTML = `<div class="alert">Erro ao carregar reversões: ${error.message}</div>`;
+  }
+}
+
+window.reverterAlteracao = async function(reversaoId) {
+  if (!confirm("Deseja reverter esta alteração?")) return;
+
+  try {
+    const refReversao = doc(db, "reversoes", reversaoId);
+    const snap = await getDoc(refReversao);
+
+    if (!snap.exists()) {
+      alert("Reversão não encontrada.");
+      return;
+    }
+
+    const reversao = snap.data();
+
+    if (reversao.status !== "disponivel") {
+      alert("Essa reversão não está mais disponível.");
+      return;
+    }
+
+    if (reversao.modulo !== "ferramentas") {
+      alert("Essa reversão não pertence a ferramentas.");
+      return;
+    }
+
+    const refDoc = doc(db, "ferramentas", reversao.documentoId);
+
+    if (reversao.acao === "editar") {
+      await updateDoc(refDoc, {
+        ...reversao.dadosAntes,
+        atualizadoEm: serverTimestamp()
+      });
+    }
+
+    if (reversao.acao === "excluir") {
+      await setDoc(refDoc, {
+        ...reversao.dadosAntes,
+        restauradoEm: serverTimestamp()
+      });
+    }
+
+    await updateDoc(refReversao, {
+      status: "revertido",
+      revertidoEm: serverTimestamp()
+    });
+
     await carregarFerramentas();
+    await carregarReversoes();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao reverter: " + error.message);
+  }
+};
+
+
+await carregarFerramentas();
+await carregarReversoes();
+    await carregarReversoes();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao excluir: ${error.message}</div>`;
@@ -224,4 +599,181 @@ function formatarNumero(valor) {
   });
 }
 
+
+/* ==============================
+   REVERSÕES - ÚLTIMAS 5 ALTERAÇÕES
+   ============================== */
+
+function criarPainelReversoes() {
+  if (document.getElementById("listaReversoesFerramentas")) return;
+
+  const painel = document.createElement("section");
+  painel.className = "card";
+  painel.innerHTML = `
+    <h3>Últimas alterações</h3>
+    <p>Permite reverter as últimas 5 alterações feitas em ferramentas.</p>
+    <div id="listaReversoesFerramentas">Carregando...</div>
+  `;
+
+  const main = document.querySelector(".main");
+  if (main) {
+    main.appendChild(painel);
+  }
+}
+
+async function registrarReversao({ modulo, acao, documentoId, descricao, dadosAntes, dadosDepois }) {
+  if (!dadosAntes) return;
+
+  await addDoc(collection(db, "reversoes"), {
+    modulo,
+    acao,
+    documentoId,
+    descricao,
+    dadosAntes,
+    dadosDepois,
+    status: "disponivel",
+    criadoEm: serverTimestamp()
+  });
+
+  await limitarReversoesFerramentas();
+}
+
+async function limitarReversoesFerramentas() {
+  const snap = await getDocs(collection(db, "reversoes"));
+  const reversoes = [];
+
+  snap.forEach((docSnap) => {
+    const r = { id: docSnap.id, ...docSnap.data() };
+    if (r.modulo === "ferramentas" && r.status === "disponivel") {
+      reversoes.push(r);
+    }
+  });
+
+  reversoes.sort((a, b) => {
+    const ta = a.criadoEm?.seconds || 0;
+    const tb = b.criadoEm?.seconds || 0;
+    return tb - ta;
+  });
+
+  const excedentes = reversoes.slice(5);
+
+  for (const item of excedentes) {
+    await updateDoc(doc(db, "reversoes", item.id), {
+      status: "expirado"
+    });
+  }
+}
+
+async function carregarReversoes() {
+  const el = document.getElementById("listaReversoesFerramentas");
+  if (!el) return;
+
+  try {
+    const snap = await getDocs(collection(db, "reversoes"));
+    const reversoes = [];
+
+    snap.forEach((docSnap) => {
+      const r = { id: docSnap.id, ...docSnap.data() };
+      if (r.modulo === "ferramentas" && r.status === "disponivel") {
+        reversoes.push(r);
+      }
+    });
+
+    reversoes.sort((a, b) => {
+      const ta = a.criadoEm?.seconds || 0;
+      const tb = b.criadoEm?.seconds || 0;
+      return tb - ta;
+    });
+
+    const ultimas = reversoes.slice(0, 5);
+
+    if (ultimas.length === 0) {
+      el.innerHTML = "<p>Nenhuma alteração disponível para reversão.</p>";
+      return;
+    }
+
+    el.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Alteração</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ultimas.map(r => `
+            <tr>
+              <td>
+                <strong>${r.descricao || "Alteração"}</strong><br>
+                <small>${r.acao || ""}</small>
+              </td>
+              <td>
+                <button class="secondary" onclick='reverterAlteracao("${r.id}")'>Reverter</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    console.error(error);
+    el.innerHTML = `<div class="alert">Erro ao carregar reversões: ${error.message}</div>`;
+  }
+}
+
+window.reverterAlteracao = async function(reversaoId) {
+  if (!confirm("Deseja reverter esta alteração?")) return;
+
+  try {
+    const refReversao = doc(db, "reversoes", reversaoId);
+    const snap = await getDoc(refReversao);
+
+    if (!snap.exists()) {
+      alert("Reversão não encontrada.");
+      return;
+    }
+
+    const reversao = snap.data();
+
+    if (reversao.status !== "disponivel") {
+      alert("Essa reversão não está mais disponível.");
+      return;
+    }
+
+    if (reversao.modulo !== "ferramentas") {
+      alert("Essa reversão não pertence a ferramentas.");
+      return;
+    }
+
+    const refDoc = doc(db, "ferramentas", reversao.documentoId);
+
+    if (reversao.acao === "editar") {
+      await updateDoc(refDoc, {
+        ...reversao.dadosAntes,
+        atualizadoEm: serverTimestamp()
+      });
+    }
+
+    if (reversao.acao === "excluir") {
+      await setDoc(refDoc, {
+        ...reversao.dadosAntes,
+        restauradoEm: serverTimestamp()
+      });
+    }
+
+    await updateDoc(refReversao, {
+      status: "revertido",
+      revertidoEm: serverTimestamp()
+    });
+
+    await carregarFerramentas();
+    await carregarReversoes();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao reverter: " + error.message);
+  }
+};
+
+
 await carregarFerramentas();
+await carregarReversoes();
