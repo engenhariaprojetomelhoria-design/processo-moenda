@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Processo Moenda - Ferramentas</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <h1>Processo Moenda</h1>
+      <div class="subtitle">Controle de ferramentas e insertos</div>
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="planejamento.html" data-page="planejamento">Planejamento</a>
+        <a href="maquinas.html" data-page="maquinas">Máquinas</a>
+        <a href="ferramentas.html" data-page="ferramentas">Ferramentas</a>
+        <a href="insertos.html" data-page="insertos">Insertos</a>
+        <a href="materiais.html" data-page="materiais">Materiais</a>
+        <a href="historico.html" data-page="historico">Histórico</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section class="topbar">
+        <div>
+          <h2>Ferramentas</h2>
+          <div>Cadastro das brocas, medidas e fabricante compatível</div>
+        </div>
+        <div class="user-info">
+          <div id="userInfo"></div>
+          <button id="logoutBtn" class="secondary">Sair</button>
+        </div>
+      </section>
+
+      <section class="grid grid-2">
+        <div class="card">
+          <h3 id="formTitulo">Adicionar ferramenta</h3>
+
+          <input id="ferramentaId" type="hidden"/>
+
+          <label>Nome da ferramenta</label>
+          <input id="nome" placeholder="Ex: Broca 16 — 8xD"/>
+
+          <label>Diâmetro da broca (mm)</label>
+          <input id="diametro" type="number" step="0.01" placeholder="Ex: 16"/>
+
+          <label>Relação xD</label>
+          <input id="xd" placeholder="Ex: 8xD, 12xD, 16xD"/>
+
+          <label>Comprimento útil/configurado (mm)</label>
+          <input id="comprimento" type="number" step="0.01" placeholder="Ex: 153"/>
+
+          <label>Fabricante</label>
+          <input id="fabricante" placeholder="Ex: Iscar, Tungaloy, Kennametal"/>
+
+          <label>Status</label>
+          <select id="ativa">
+            <option value="true">Ativa</option>
+            <option value="false">Inativa</option>
+          </select>
+
+          <label>Observações</label>
+          <textarea id="observacoes" placeholder="Observações internas"></textarea>
+
+          <button id="salvarBtn" class="success">Salvar ferramenta</button>
+          <button id="limparBtn" class="secondary">Limpar</button>
+
+          <div id="msg"></div>
+        </div>
+
+        <div class="card">
+          <h3>Ferramentas cadastradas</h3>
+          <p class="small">Compatibilidade futura: mesmo fabricante + mesmo diâmetro + ferramenta ativa.</p>
+          <div id="listaFerramentas">Carregando...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="js/ferramentas.js"></script>
+</body>
+</html>
