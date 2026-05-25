@@ -31,7 +31,7 @@ document.getElementById("salvarBtn").addEventListener("click", salvarInserto);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
 
 criarPainelReversao();
-async function carregarFabricantesFerramentas() {
+{
   const snap = await getDocs(collection(db, "ferramentas"));
   const fabricantes = new Set();
   const diametros = new Set();
@@ -499,4 +499,5 @@ async function reverterUltimaAlteracao() {
   }
 }
 
+await carregarFabricantesFerramentas();
 await carregarTudo();
