@@ -5,8 +5,6 @@ import {
   addDoc,
   getDocs,
   doc,
-  getDoc,
-  setDoc,
   updateDoc,
   deleteDoc,
   serverTimestamp
@@ -26,10 +24,12 @@ const msgEl = document.getElementById("msg");
 const listaEl = document.getElementById("listaFerramentas");
 const tituloEl = document.getElementById("formTitulo");
 
+let ultimaReversao = null;
+
 document.getElementById("salvarBtn").addEventListener("click", salvarFerramenta);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
 
-criarPainelReversoes();
+criarPainelReversao();
 
 function atualizarNomeAutomatico() {
   const fabricante = fabricanteEl.value.trim();
@@ -47,6 +47,7 @@ xdEl.addEventListener("input", atualizarNomeAutomatico);
 
 async function salvarFerramenta() {
   atualizarNomeAutomatico();
+
   const nome = nomeEl.value.trim();
   const diametro = Number(diametroEl.value);
   const xd = xdEl.value.trim();
@@ -88,22 +89,20 @@ async function salvarFerramenta() {
 
   try {
     if (idEl.value) {
-      const ref = doc(db, "ferramentas", idEl.value);
-      const snapAntes = await getDoc(ref);
-      const dadosAntes = snapAntes.exists() ? snapAntes.data() : null;
+      const ferramentasAtuais = await buscarFerramentas();
+      const anterior = ferramentasAtuais.find(f => f.id === idEl.value);
 
-      await updateDoc(ref, dados);
+      if (anterior) {
+        ultimaReversao = {
+          tipo: "editar",
+          id: idEl.value,
+          dados: { ...anterior }
+        };
+      }
 
-      await registrarReversao({
-        modulo: "ferramentas",
-        acao: "editar",
-        documentoId: idEl.value,
-        descricao: `Ferramenta editada: ${dadosAntes?.nome || nome}`,
-        dadosAntes,
-        dadosDepois: dados
-      });
-
+      await updateDoc(doc(db, "ferramentas", idEl.value), dados);
       msgEl.innerHTML = '<div class="ok">Ferramenta atualizada com sucesso.</div>';
+      atualizarPainelReversao();
     } else {
       await addDoc(collection(db, "ferramentas"), {
         ...dados,
@@ -114,200 +113,112 @@ async function salvarFerramenta() {
 
     limparFormulario(false);
     
-/* ==============================
-   REVERSÕES - ÚLTIMAS 5 ALTERAÇÕES
-   ============================== */
-
-function criarPainelReversoes() {
-  if (document.getElementById("listaReversoesFerramentas")) return;
-
+function criarPainelReversao() {
   const painel = document.createElement("section");
   painel.className = "card";
   painel.innerHTML = `
-    <h3>Últimas alterações</h3>
-    <p>Permite reverter as últimas 5 alterações feitas em ferramentas.</p>
-    <div id="listaReversoesFerramentas">Carregando...</div>
+    <h3>Reversão rápida</h3>
+    <p>Permite reverter a última alteração feita nesta tela enquanto a página estiver aberta.</p>
+    <button id="reverterUltimaBtn" class="secondary" disabled>Reverter última alteração</button>
+    <div id="msgReversao" style="margin-top: 10px;"></div>
   `;
 
   const main = document.querySelector(".main");
   if (main) {
     main.appendChild(painel);
   }
+
+  document.getElementById("reverterUltimaBtn").addEventListener("click", reverterUltimaAlteracao);
+  atualizarPainelReversao();
 }
 
-async function registrarReversao({ modulo, acao, documentoId, descricao, dadosAntes, dadosDepois }) {
-  if (!dadosAntes) return;
+function atualizarPainelReversao() {
+  const btn = document.getElementById("reverterUltimaBtn");
+  const msg = document.getElementById("msgReversao");
 
-  await addDoc(collection(db, "reversoes"), {
-    modulo,
-    acao,
-    documentoId,
-    descricao,
-    dadosAntes,
-    dadosDepois,
-    status: "disponivel",
-    criadoEm: serverTimestamp()
-  });
+  if (!btn || !msg) return;
 
-  await limitarReversoesFerramentas();
-}
-
-async function limitarReversoesFerramentas() {
-  const snap = await getDocs(collection(db, "reversoes"));
-  const reversoes = [];
-
-  snap.forEach((docSnap) => {
-    const r = { id: docSnap.id, ...docSnap.data() };
-    if (r.modulo === "ferramentas" && r.status === "disponivel") {
-      reversoes.push(r);
-    }
-  });
-
-  reversoes.sort((a, b) => {
-    const ta = a.criadoEm?.seconds || 0;
-    const tb = b.criadoEm?.seconds || 0;
-    return tb - ta;
-  });
-
-  const excedentes = reversoes.slice(5);
-
-  for (const item of excedentes) {
-    await updateDoc(doc(db, "reversoes", item.id), {
-      status: "expirado"
-    });
+  if (!ultimaReversao) {
+    btn.disabled = true;
+    msg.innerHTML = "<small>Nenhuma alteração para reverter.</small>";
+    return;
   }
+
+  btn.disabled = false;
+  const nome = ultimaReversao.dados?.nome || "ferramenta";
+  const acao = ultimaReversao.tipo === "excluir" ? "exclusão" : "edição";
+  msg.innerHTML = `<small>Última alteração disponível: ${acao} de <strong>${nome}</strong>.</small>`;
 }
 
-async function carregarReversoes() {
-  const el = document.getElementById("listaReversoesFerramentas");
-  if (!el) return;
+async function reverterUltimaAlteracao() {
+  if (!ultimaReversao) return;
+
+  if (!confirm("Deseja reverter a última alteração?")) return;
 
   try {
-    const snap = await getDocs(collection(db, "reversoes"));
-    const reversoes = [];
+    const dados = { ...ultimaReversao.dados };
 
-    snap.forEach((docSnap) => {
-      const r = { id: docSnap.id, ...docSnap.data() };
-      if (r.modulo === "ferramentas" && r.status === "disponivel") {
-        reversoes.push(r);
-      }
-    });
-
-    reversoes.sort((a, b) => {
-      const ta = a.criadoEm?.seconds || 0;
-      const tb = b.criadoEm?.seconds || 0;
-      return tb - ta;
-    });
-
-    const ultimas = reversoes.slice(0, 5);
-
-    if (ultimas.length === 0) {
-      el.innerHTML = "<p>Nenhuma alteração disponível para reversão.</p>";
-      return;
-    }
-
-    el.innerHTML = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Alteração</th>
-            <th>Ação</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${ultimas.map(r => `
-            <tr>
-              <td>
-                <strong>${r.descricao || "Alteração"}</strong><br>
-                <small>${r.acao || ""}</small>
-              </td>
-              <td>
-                <button class="secondary" onclick='reverterAlteracao("${r.id}")'>Reverter</button>
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
-  } catch (error) {
-    console.error(error);
-    el.innerHTML = `<div class="alert">Erro ao carregar reversões: ${error.message}</div>`;
-  }
-}
-
-window.reverterAlteracao = async function(reversaoId) {
-  if (!confirm("Deseja reverter esta alteração?")) return;
-
-  try {
-    const refReversao = doc(db, "reversoes", reversaoId);
-    const snap = await getDoc(refReversao);
-
-    if (!snap.exists()) {
-      alert("Reversão não encontrada.");
-      return;
-    }
-
-    const reversao = snap.data();
-
-    if (reversao.status !== "disponivel") {
-      alert("Essa reversão não está mais disponível.");
-      return;
-    }
-
-    if (reversao.modulo !== "ferramentas") {
-      alert("Essa reversão não pertence a ferramentas.");
-      return;
-    }
-
-    const refDoc = doc(db, "ferramentas", reversao.documentoId);
-
-    if (reversao.acao === "editar") {
-      await updateDoc(refDoc, {
-        ...reversao.dadosAntes,
+    if (ultimaReversao.tipo === "editar") {
+      await updateDoc(doc(db, "ferramentas", ultimaReversao.id), {
+        nome: dados.nome || "",
+        diametro: Number(dados.diametro || 0),
+        xd: dados.xd || "",
+        comprimento: Number(dados.comprimento || 0),
+        fabricante: dados.fabricante || "",
+        observacoes: dados.observacoes || "",
+        ativa: dados.ativa !== false,
         atualizadoEm: serverTimestamp()
       });
     }
 
-    if (reversao.acao === "excluir") {
-      await setDoc(refDoc, {
-        ...reversao.dadosAntes,
-        restauradoEm: serverTimestamp()
+    if (ultimaReversao.tipo === "excluir") {
+      await addDoc(collection(db, "ferramentas"), {
+        nome: dados.nome || "",
+        diametro: Number(dados.diametro || 0),
+        xd: dados.xd || "",
+        comprimento: Number(dados.comprimento || 0),
+        fabricante: dados.fabricante || "",
+        observacoes: dados.observacoes || "",
+        ativa: dados.ativa !== false,
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp()
       });
     }
 
-    await updateDoc(refReversao, {
-      status: "revertido",
-      revertidoEm: serverTimestamp()
-    });
-
+    ultimaReversao = null;
     await carregarFerramentas();
-    await carregarReversoes();
+    atualizarPainelReversao();
+
+    msgEl.innerHTML = '<div class="ok">Última alteração revertida com sucesso.</div>';
   } catch (error) {
     console.error(error);
-    alert("Erro ao reverter: " + error.message);
+    msgEl.innerHTML = `<div class="alert">Erro ao reverter: ${error.message}</div>`;
   }
-};
+}
 
 
 await carregarFerramentas();
-await carregarReversoes();
-    await carregarReversoes();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao salvar: ${error.message}</div>`;
   }
 }
 
+async function buscarFerramentas() {
+  const snap = await getDocs(collection(db, "ferramentas"));
+  const ferramentas = [];
+
+  snap.forEach((docSnap) => {
+    ferramentas.push({ id: docSnap.id, ...docSnap.data() });
+  });
+
+  return ferramentas;
+}
+
 async function carregarFerramentas() {
   try {
-    const snap = await getDocs(collection(db, "ferramentas"));
-    const ferramentas = [];
+    const ferramentas = await buscarFerramentas();
 
-    snap.forEach((docSnap) => {
-      ferramentas.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    // Ordem alfabética principal pelo nome da ferramenta
     ferramentas.sort((a, b) => {
       const nomeA = (a.nome || "").toLowerCase();
       const nomeB = (b.nome || "").toLowerCase();
@@ -381,194 +292,112 @@ window.duplicarFerramenta = function(f) {
   ativaEl.value = String(f.ativa !== false);
   obsEl.value = f.observacoes || "";
   tituloEl.textContent = "Duplicar ferramenta";
-  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Ajuste o fabricante ou outros dados e clique em Salvar.</div>';
-  fabricanteEl.focus();
+  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário.</div>';
 };
 
 window.excluirFerramenta = async function(id) {
   if (!confirm("Deseja excluir esta ferramenta?")) return;
 
   try {
+    const ferramentasAtuais = await buscarFerramentas();
+    const anterior = ferramentasAtuais.find(f => f.id === id);
+
+    if (anterior) {
+      ultimaReversao = {
+        tipo: "excluir",
+        id,
+        dados: { ...anterior }
+      };
+    }
+
     await deleteDoc(doc(db, "ferramentas", id));
     
-/* ==============================
-   REVERSÕES - ÚLTIMAS 5 ALTERAÇÕES
-   ============================== */
-
-function criarPainelReversoes() {
-  if (document.getElementById("listaReversoesFerramentas")) return;
-
+function criarPainelReversao() {
   const painel = document.createElement("section");
   painel.className = "card";
   painel.innerHTML = `
-    <h3>Últimas alterações</h3>
-    <p>Permite reverter as últimas 5 alterações feitas em ferramentas.</p>
-    <div id="listaReversoesFerramentas">Carregando...</div>
+    <h3>Reversão rápida</h3>
+    <p>Permite reverter a última alteração feita nesta tela enquanto a página estiver aberta.</p>
+    <button id="reverterUltimaBtn" class="secondary" disabled>Reverter última alteração</button>
+    <div id="msgReversao" style="margin-top: 10px;"></div>
   `;
 
   const main = document.querySelector(".main");
   if (main) {
     main.appendChild(painel);
   }
+
+  document.getElementById("reverterUltimaBtn").addEventListener("click", reverterUltimaAlteracao);
+  atualizarPainelReversao();
 }
 
-async function registrarReversao({ modulo, acao, documentoId, descricao, dadosAntes, dadosDepois }) {
-  if (!dadosAntes) return;
+function atualizarPainelReversao() {
+  const btn = document.getElementById("reverterUltimaBtn");
+  const msg = document.getElementById("msgReversao");
 
-  await addDoc(collection(db, "reversoes"), {
-    modulo,
-    acao,
-    documentoId,
-    descricao,
-    dadosAntes,
-    dadosDepois,
-    status: "disponivel",
-    criadoEm: serverTimestamp()
-  });
+  if (!btn || !msg) return;
 
-  await limitarReversoesFerramentas();
-}
-
-async function limitarReversoesFerramentas() {
-  const snap = await getDocs(collection(db, "reversoes"));
-  const reversoes = [];
-
-  snap.forEach((docSnap) => {
-    const r = { id: docSnap.id, ...docSnap.data() };
-    if (r.modulo === "ferramentas" && r.status === "disponivel") {
-      reversoes.push(r);
-    }
-  });
-
-  reversoes.sort((a, b) => {
-    const ta = a.criadoEm?.seconds || 0;
-    const tb = b.criadoEm?.seconds || 0;
-    return tb - ta;
-  });
-
-  const excedentes = reversoes.slice(5);
-
-  for (const item of excedentes) {
-    await updateDoc(doc(db, "reversoes", item.id), {
-      status: "expirado"
-    });
+  if (!ultimaReversao) {
+    btn.disabled = true;
+    msg.innerHTML = "<small>Nenhuma alteração para reverter.</small>";
+    return;
   }
+
+  btn.disabled = false;
+  const nome = ultimaReversao.dados?.nome || "ferramenta";
+  const acao = ultimaReversao.tipo === "excluir" ? "exclusão" : "edição";
+  msg.innerHTML = `<small>Última alteração disponível: ${acao} de <strong>${nome}</strong>.</small>`;
 }
 
-async function carregarReversoes() {
-  const el = document.getElementById("listaReversoesFerramentas");
-  if (!el) return;
+async function reverterUltimaAlteracao() {
+  if (!ultimaReversao) return;
+
+  if (!confirm("Deseja reverter a última alteração?")) return;
 
   try {
-    const snap = await getDocs(collection(db, "reversoes"));
-    const reversoes = [];
+    const dados = { ...ultimaReversao.dados };
 
-    snap.forEach((docSnap) => {
-      const r = { id: docSnap.id, ...docSnap.data() };
-      if (r.modulo === "ferramentas" && r.status === "disponivel") {
-        reversoes.push(r);
-      }
-    });
-
-    reversoes.sort((a, b) => {
-      const ta = a.criadoEm?.seconds || 0;
-      const tb = b.criadoEm?.seconds || 0;
-      return tb - ta;
-    });
-
-    const ultimas = reversoes.slice(0, 5);
-
-    if (ultimas.length === 0) {
-      el.innerHTML = "<p>Nenhuma alteração disponível para reversão.</p>";
-      return;
-    }
-
-    el.innerHTML = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Alteração</th>
-            <th>Ação</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${ultimas.map(r => `
-            <tr>
-              <td>
-                <strong>${r.descricao || "Alteração"}</strong><br>
-                <small>${r.acao || ""}</small>
-              </td>
-              <td>
-                <button class="secondary" onclick='reverterAlteracao("${r.id}")'>Reverter</button>
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
-  } catch (error) {
-    console.error(error);
-    el.innerHTML = `<div class="alert">Erro ao carregar reversões: ${error.message}</div>`;
-  }
-}
-
-window.reverterAlteracao = async function(reversaoId) {
-  if (!confirm("Deseja reverter esta alteração?")) return;
-
-  try {
-    const refReversao = doc(db, "reversoes", reversaoId);
-    const snap = await getDoc(refReversao);
-
-    if (!snap.exists()) {
-      alert("Reversão não encontrada.");
-      return;
-    }
-
-    const reversao = snap.data();
-
-    if (reversao.status !== "disponivel") {
-      alert("Essa reversão não está mais disponível.");
-      return;
-    }
-
-    if (reversao.modulo !== "ferramentas") {
-      alert("Essa reversão não pertence a ferramentas.");
-      return;
-    }
-
-    const refDoc = doc(db, "ferramentas", reversao.documentoId);
-
-    if (reversao.acao === "editar") {
-      await updateDoc(refDoc, {
-        ...reversao.dadosAntes,
+    if (ultimaReversao.tipo === "editar") {
+      await updateDoc(doc(db, "ferramentas", ultimaReversao.id), {
+        nome: dados.nome || "",
+        diametro: Number(dados.diametro || 0),
+        xd: dados.xd || "",
+        comprimento: Number(dados.comprimento || 0),
+        fabricante: dados.fabricante || "",
+        observacoes: dados.observacoes || "",
+        ativa: dados.ativa !== false,
         atualizadoEm: serverTimestamp()
       });
     }
 
-    if (reversao.acao === "excluir") {
-      await setDoc(refDoc, {
-        ...reversao.dadosAntes,
-        restauradoEm: serverTimestamp()
+    if (ultimaReversao.tipo === "excluir") {
+      await addDoc(collection(db, "ferramentas"), {
+        nome: dados.nome || "",
+        diametro: Number(dados.diametro || 0),
+        xd: dados.xd || "",
+        comprimento: Number(dados.comprimento || 0),
+        fabricante: dados.fabricante || "",
+        observacoes: dados.observacoes || "",
+        ativa: dados.ativa !== false,
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp()
       });
     }
 
-    await updateDoc(refReversao, {
-      status: "revertido",
-      revertidoEm: serverTimestamp()
-    });
-
+    ultimaReversao = null;
     await carregarFerramentas();
-    await carregarReversoes();
+    atualizarPainelReversao();
+
+    msgEl.innerHTML = '<div class="ok">Última alteração revertida com sucesso.</div>';
   } catch (error) {
     console.error(error);
-    alert("Erro ao reverter: " + error.message);
+    msgEl.innerHTML = `<div class="alert">Erro ao reverter: ${error.message}</div>`;
   }
-};
+}
 
 
 await carregarFerramentas();
-await carregarReversoes();
-    await carregarReversoes();
+    atualizarPainelReversao();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao excluir: ${error.message}</div>`;
@@ -600,180 +429,88 @@ function formatarNumero(valor) {
 }
 
 
-/* ==============================
-   REVERSÕES - ÚLTIMAS 5 ALTERAÇÕES
-   ============================== */
-
-function criarPainelReversoes() {
-  if (document.getElementById("listaReversoesFerramentas")) return;
-
+function criarPainelReversao() {
   const painel = document.createElement("section");
   painel.className = "card";
   painel.innerHTML = `
-    <h3>Últimas alterações</h3>
-    <p>Permite reverter as últimas 5 alterações feitas em ferramentas.</p>
-    <div id="listaReversoesFerramentas">Carregando...</div>
+    <h3>Reversão rápida</h3>
+    <p>Permite reverter a última alteração feita nesta tela enquanto a página estiver aberta.</p>
+    <button id="reverterUltimaBtn" class="secondary" disabled>Reverter última alteração</button>
+    <div id="msgReversao" style="margin-top: 10px;"></div>
   `;
 
   const main = document.querySelector(".main");
   if (main) {
     main.appendChild(painel);
   }
+
+  document.getElementById("reverterUltimaBtn").addEventListener("click", reverterUltimaAlteracao);
+  atualizarPainelReversao();
 }
 
-async function registrarReversao({ modulo, acao, documentoId, descricao, dadosAntes, dadosDepois }) {
-  if (!dadosAntes) return;
+function atualizarPainelReversao() {
+  const btn = document.getElementById("reverterUltimaBtn");
+  const msg = document.getElementById("msgReversao");
 
-  await addDoc(collection(db, "reversoes"), {
-    modulo,
-    acao,
-    documentoId,
-    descricao,
-    dadosAntes,
-    dadosDepois,
-    status: "disponivel",
-    criadoEm: serverTimestamp()
-  });
+  if (!btn || !msg) return;
 
-  await limitarReversoesFerramentas();
-}
-
-async function limitarReversoesFerramentas() {
-  const snap = await getDocs(collection(db, "reversoes"));
-  const reversoes = [];
-
-  snap.forEach((docSnap) => {
-    const r = { id: docSnap.id, ...docSnap.data() };
-    if (r.modulo === "ferramentas" && r.status === "disponivel") {
-      reversoes.push(r);
-    }
-  });
-
-  reversoes.sort((a, b) => {
-    const ta = a.criadoEm?.seconds || 0;
-    const tb = b.criadoEm?.seconds || 0;
-    return tb - ta;
-  });
-
-  const excedentes = reversoes.slice(5);
-
-  for (const item of excedentes) {
-    await updateDoc(doc(db, "reversoes", item.id), {
-      status: "expirado"
-    });
+  if (!ultimaReversao) {
+    btn.disabled = true;
+    msg.innerHTML = "<small>Nenhuma alteração para reverter.</small>";
+    return;
   }
+
+  btn.disabled = false;
+  const nome = ultimaReversao.dados?.nome || "ferramenta";
+  const acao = ultimaReversao.tipo === "excluir" ? "exclusão" : "edição";
+  msg.innerHTML = `<small>Última alteração disponível: ${acao} de <strong>${nome}</strong>.</small>`;
 }
 
-async function carregarReversoes() {
-  const el = document.getElementById("listaReversoesFerramentas");
-  if (!el) return;
+async function reverterUltimaAlteracao() {
+  if (!ultimaReversao) return;
+
+  if (!confirm("Deseja reverter a última alteração?")) return;
 
   try {
-    const snap = await getDocs(collection(db, "reversoes"));
-    const reversoes = [];
+    const dados = { ...ultimaReversao.dados };
 
-    snap.forEach((docSnap) => {
-      const r = { id: docSnap.id, ...docSnap.data() };
-      if (r.modulo === "ferramentas" && r.status === "disponivel") {
-        reversoes.push(r);
-      }
-    });
-
-    reversoes.sort((a, b) => {
-      const ta = a.criadoEm?.seconds || 0;
-      const tb = b.criadoEm?.seconds || 0;
-      return tb - ta;
-    });
-
-    const ultimas = reversoes.slice(0, 5);
-
-    if (ultimas.length === 0) {
-      el.innerHTML = "<p>Nenhuma alteração disponível para reversão.</p>";
-      return;
-    }
-
-    el.innerHTML = `
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Alteração</th>
-            <th>Ação</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${ultimas.map(r => `
-            <tr>
-              <td>
-                <strong>${r.descricao || "Alteração"}</strong><br>
-                <small>${r.acao || ""}</small>
-              </td>
-              <td>
-                <button class="secondary" onclick='reverterAlteracao("${r.id}")'>Reverter</button>
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
-  } catch (error) {
-    console.error(error);
-    el.innerHTML = `<div class="alert">Erro ao carregar reversões: ${error.message}</div>`;
-  }
-}
-
-window.reverterAlteracao = async function(reversaoId) {
-  if (!confirm("Deseja reverter esta alteração?")) return;
-
-  try {
-    const refReversao = doc(db, "reversoes", reversaoId);
-    const snap = await getDoc(refReversao);
-
-    if (!snap.exists()) {
-      alert("Reversão não encontrada.");
-      return;
-    }
-
-    const reversao = snap.data();
-
-    if (reversao.status !== "disponivel") {
-      alert("Essa reversão não está mais disponível.");
-      return;
-    }
-
-    if (reversao.modulo !== "ferramentas") {
-      alert("Essa reversão não pertence a ferramentas.");
-      return;
-    }
-
-    const refDoc = doc(db, "ferramentas", reversao.documentoId);
-
-    if (reversao.acao === "editar") {
-      await updateDoc(refDoc, {
-        ...reversao.dadosAntes,
+    if (ultimaReversao.tipo === "editar") {
+      await updateDoc(doc(db, "ferramentas", ultimaReversao.id), {
+        nome: dados.nome || "",
+        diametro: Number(dados.diametro || 0),
+        xd: dados.xd || "",
+        comprimento: Number(dados.comprimento || 0),
+        fabricante: dados.fabricante || "",
+        observacoes: dados.observacoes || "",
+        ativa: dados.ativa !== false,
         atualizadoEm: serverTimestamp()
       });
     }
 
-    if (reversao.acao === "excluir") {
-      await setDoc(refDoc, {
-        ...reversao.dadosAntes,
-        restauradoEm: serverTimestamp()
+    if (ultimaReversao.tipo === "excluir") {
+      await addDoc(collection(db, "ferramentas"), {
+        nome: dados.nome || "",
+        diametro: Number(dados.diametro || 0),
+        xd: dados.xd || "",
+        comprimento: Number(dados.comprimento || 0),
+        fabricante: dados.fabricante || "",
+        observacoes: dados.observacoes || "",
+        ativa: dados.ativa !== false,
+        criadoEm: serverTimestamp(),
+        atualizadoEm: serverTimestamp()
       });
     }
 
-    await updateDoc(refReversao, {
-      status: "revertido",
-      revertidoEm: serverTimestamp()
-    });
-
+    ultimaReversao = null;
     await carregarFerramentas();
-    await carregarReversoes();
+    atualizarPainelReversao();
+
+    msgEl.innerHTML = '<div class="ok">Última alteração revertida com sucesso.</div>';
   } catch (error) {
     console.error(error);
-    alert("Erro ao reverter: " + error.message);
+    msgEl.innerHTML = `<div class="alert">Erro ao reverter: ${error.message}</div>`;
   }
-};
+}
 
 
 await carregarFerramentas();
-await carregarReversoes();
