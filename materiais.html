@@ -1,1 +1,77 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Processo Moenda - Materiais</title><link rel="stylesheet" href="css/style.css"/></head><body><div class="app-shell"><aside class="sidebar"><h1>Processo Moenda</h1><div class="subtitle">Controle de ferramentas e insertos</div><nav class="nav"><a href="dashboard.html" data-page="dashboard">Dashboard</a><a href="planejamento.html" data-page="planejamento">Planejamento</a><a href="maquinas.html" data-page="maquinas">Máquinas</a><a href="ferramentas.html" data-page="ferramentas">Ferramentas</a><a href="insertos.html" data-page="insertos">Insertos</a><a href="materiais.html" data-page="materiais">Materiais</a><a href="historico.html" data-page="historico">Histórico</a></nav></aside><main class="main"><section class="topbar"><div><h2>Materiais</h2><div>Cadastrar materiais e percentual de vida do inserto.</div></div><div class="user-info"><div id="userInfo"></div><button id="logoutBtn" class="secondary">Sair</button></div></section><section class="card"><h3>Materiais</h3><p>Cadastrar materiais e percentual de vida do inserto.</p><p>Esta tela será desenvolvida na próxima etapa.</p></section></main></div><script type="module">import { protegerPagina } from "./js/layout.js"; await protegerPagina("materiais");</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Processo Moenda - Materiais</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <h1>Processo Moenda</h1>
+      <div class="subtitle">Controle de ferramentas e insertos</div>
+
+      <nav class="nav">
+        <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+        <a href="planejamento.html" data-page="planejamento">Planejamento</a>
+        <a href="maquinas.html" data-page="maquinas">Máquinas</a>
+        <a href="ferramentas.html" data-page="ferramentas">Ferramentas</a>
+        <a href="insertos.html" data-page="insertos">Insertos</a>
+        <a href="materiais.html" data-page="materiais">Materiais</a>
+        <a href="historico.html" data-page="historico">Histórico</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section class="topbar">
+        <div>
+          <h2>Materiais</h2>
+          <div>Cadastro do material e percentual de desgaste aplicado ao inserto</div>
+        </div>
+
+        <div class="user-info">
+          <div id="userInfo"></div>
+          <button id="logoutBtn" class="secondary">Sair</button>
+        </div>
+      </section>
+
+      <section class="grid grid-2">
+        <div class="card">
+          <h3 id="formTitulo">Adicionar material</h3>
+
+          <input id="materialId" type="hidden"/>
+
+          <label>Material</label>
+          <input id="nome" placeholder="Ex: Ferro Fundido Cinzento"/>
+
+          <label>Desgaste do inserto (%)</label>
+          <input id="desgaste" type="number" step="0.01" min="0" max="100" placeholder="Ex: 0 ou 50"/>
+
+          <label>Status</label>
+          <select id="ativo">
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+
+          <label>Observações</label>
+          <textarea id="observacoes" placeholder="Ex: material mais abrasivo, teste de vida útil, observações internas"></textarea>
+
+          <button id="salvarBtn" class="success">Salvar material</button>
+          <button id="limparBtn" class="secondary">Limpar</button>
+
+          <div id="msg"></div>
+        </div>
+
+        <div class="card">
+          <h3>Materiais cadastrados</h3>
+          <p class="small">No planejamento: vida final = vida do inserto × (1 - desgaste/100).</p>
+          <div id="listaMateriais">Carregando...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="js/materiais.js"></script>
+</body>
+</html>
