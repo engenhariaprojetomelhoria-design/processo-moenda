@@ -15,6 +15,7 @@ await protegerPagina("insertos");
 const idEl = document.getElementById("insertoId");
 const marcaEl = document.getElementById("marca");
 const modeloEl = document.getElementById("modelo");
+const diametroEl = document.getElementById("diametro");
 const vidaSeguraEl = document.getElementById("vidaSegura");
 const toleranciaEl = document.getElementById("tolerancia");
 const ativoEl = document.getElementById("ativo");
@@ -30,35 +31,36 @@ document.getElementById("salvarBtn").addEventListener("click", salvarInserto);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
 
 criarPainelReversao();
-
 await carregarFabricantesFerramentas();
 
 async function carregarFabricantesFerramentas() {
   const snap = await getDocs(collection(db, "ferramentas"));
   const fabricantes = new Set();
+  const diametros = new Set();
 
   snap.forEach((docSnap) => {
     const f = docSnap.data();
-    if (f.fabricante) {
-      fabricantes.add(f.fabricante.trim());
-    }
+
+    if (f.fabricante) fabricantes.add(f.fabricante.trim());
+    if (f.diametro) diametros.add(Number(f.diametro));
   });
 
-  const lista = Array.from(fabricantes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const listaFabricantes = Array.from(fabricantes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const listaDiametros = Array.from(diametros).sort((a, b) => a - b);
 
-  if (lista.length === 0) {
-    marcaEl.innerHTML = '<option value="">Cadastre uma ferramenta primeiro</option>';
-    return;
-  }
+  marcaEl.innerHTML = listaFabricantes.length
+    ? '<option value="">Selecione o fabricante</option>' + listaFabricantes.map(f => `<option value="${f}">${f}</option>`).join("")
+    : '<option value="">Cadastre uma ferramenta primeiro</option>';
 
-  marcaEl.innerHTML =
-    '<option value="">Selecione o fabricante</option>' +
-    lista.map(f => `<option value="${f}">${f}</option>`).join("");
+  diametroEl.innerHTML = listaDiametros.length
+    ? '<option value="">Selecione o diâmetro</option>' + listaDiametros.map(d => `<option value="${d}">Ø ${d} mm</option>`).join("")
+    : '<option value="">Cadastre uma ferramenta primeiro</option>';
 }
 
 async function salvarInserto() {
   const marca = marcaEl.value.trim();
   const modelo = modeloEl.value.trim();
+  const diametro = Number(diametroEl.value);
   const vidaSegura = Number(vidaSeguraEl.value);
   const tolerancia = Number(toleranciaEl.value || 0);
   const ativo = ativoEl.value === "true";
@@ -66,6 +68,11 @@ async function salvarInserto() {
 
   if (!marca) {
     msgEl.innerHTML = '<div class="alert">Selecione a marca/fabricante do inserto.</div>';
+    return;
+  }
+
+  if (!diametro || diametro <= 0) {
+    msgEl.innerHTML = '<div class="alert">Selecione o diâmetro compatível.</div>';
     return;
   }
 
@@ -82,6 +89,7 @@ async function salvarInserto() {
   const dados = {
     marca,
     modelo,
+    diametro,
     vidaSegura,
     tolerancia,
     vidaTotal: vidaSegura + tolerancia,
@@ -194,7 +202,7 @@ function renderNovos(insertos) {
             <tr>
               <td>
                 <strong>${marca}</strong><br>
-                <small>${i.modelo || ""}</small>
+                <small>${i.modelo || ""} • Ø ${i.diametro || "-"} mm</small>
               </td>
               <td>${formatarNumero(vidaSegura)} m</td>
               <td>${formatarNumero(tolerancia)} m</td>
@@ -237,7 +245,7 @@ function renderUsados(usados) {
           <tr>
             <td>
               <strong>${i.marca || ""}</strong><br>
-              <small>${i.modelo || ""}</small>
+              <small>${i.modelo || ""} • Ø ${i.diametro || "-"} mm</small>
             </td>
             <td>${formatarNumero(i.vidaResidual || 0)} m</td>
             <td>${i.origem || "-"}</td>
@@ -272,6 +280,7 @@ window.duplicarUsado = async function(i) {
     const dadosNovo = {
       marca: i.marca || i.nome || "",
       modelo: i.modelo || "",
+      diametro: Number(i.diametro || 0),
       vidaSegura: Number(i.vidaSegura || 0),
       tolerancia: Number(i.tolerancia || 0),
       vidaTotal: Number(i.vidaTotal || ((Number(i.vidaSegura || 0)) + (Number(i.tolerancia || 0)))),
@@ -336,6 +345,7 @@ window.editarInserto = function(i) {
   idEl.value = i.id;
   marcaEl.value = i.marca || i.nome || "";
   modeloEl.value = i.modelo || "";
+  diametroEl.value = i.diametro || "";
   vidaSeguraEl.value = i.vidaSegura || "";
   toleranciaEl.value = i.tolerancia || "";
   ativoEl.value = String(i.ativo !== false);
@@ -372,6 +382,7 @@ function limparFormulario(limparMsg = true) {
   idEl.value = "";
   marcaEl.value = "";
   modeloEl.value = "";
+  diametroEl.value = "";
   vidaSeguraEl.value = "";
   toleranciaEl.value = "";
   ativoEl.value = "true";
