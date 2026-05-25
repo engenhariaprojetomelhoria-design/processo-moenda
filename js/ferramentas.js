@@ -25,6 +25,7 @@ const listaEl = document.getElementById("listaFerramentas");
 const tituloEl = document.getElementById("formTitulo");
 
 let ultimaReversao = null;
+let modoDuplicacao = false;
 
 document.getElementById("salvarBtn").addEventListener("click", salvarFerramenta);
 document.getElementById("limparBtn").addEventListener("click", () => limparFormulario());
@@ -102,102 +103,25 @@ async function salvarFerramenta() {
 
       await updateDoc(doc(db, "ferramentas", idEl.value), dados);
       msgEl.innerHTML = '<div class="ok">Ferramenta atualizada com sucesso.</div>';
-      atualizarPainelReversao();
     } else {
-      await addDoc(collection(db, "ferramentas"), {
+      const novoDoc = await addDoc(collection(db, "ferramentas"), {
         ...dados,
         criadoEm: serverTimestamp()
       });
+
+      ultimaReversao = {
+        tipo: modoDuplicacao ? "duplicar" : "criar",
+        id: novoDoc.id,
+        dados: { id: novoDoc.id, ...dados }
+      };
+
       msgEl.innerHTML = '<div class="ok">Ferramenta cadastrada com sucesso.</div>';
     }
 
+    modoDuplicacao = false;
     limparFormulario(false);
-    
-function criarPainelReversao() {
-  const painel = document.createElement("section");
-  painel.className = "card";
-  painel.innerHTML = `
-    <h3>Reversão rápida</h3>
-    <p>Permite reverter a última alteração feita nesta tela enquanto a página estiver aberta.</p>
-    <button id="reverterUltimaBtn" class="secondary" disabled>Reverter última alteração</button>
-    <div id="msgReversao" style="margin-top: 10px;"></div>
-  `;
-
-  const main = document.querySelector(".main");
-  if (main) {
-    main.appendChild(painel);
-  }
-
-  document.getElementById("reverterUltimaBtn").addEventListener("click", reverterUltimaAlteracao);
-  atualizarPainelReversao();
-}
-
-function atualizarPainelReversao() {
-  const btn = document.getElementById("reverterUltimaBtn");
-  const msg = document.getElementById("msgReversao");
-
-  if (!btn || !msg) return;
-
-  if (!ultimaReversao) {
-    btn.disabled = true;
-    msg.innerHTML = "<small>Nenhuma alteração para reverter.</small>";
-    return;
-  }
-
-  btn.disabled = false;
-  const nome = ultimaReversao.dados?.nome || "ferramenta";
-  const acao = ultimaReversao.tipo === "excluir" ? "exclusão" : "edição";
-  msg.innerHTML = `<small>Última alteração disponível: ${acao} de <strong>${nome}</strong>.</small>`;
-}
-
-async function reverterUltimaAlteracao() {
-  if (!ultimaReversao) return;
-
-  if (!confirm("Deseja reverter a última alteração?")) return;
-
-  try {
-    const dados = { ...ultimaReversao.dados };
-
-    if (ultimaReversao.tipo === "editar") {
-      await updateDoc(doc(db, "ferramentas", ultimaReversao.id), {
-        nome: dados.nome || "",
-        diametro: Number(dados.diametro || 0),
-        xd: dados.xd || "",
-        comprimento: Number(dados.comprimento || 0),
-        fabricante: dados.fabricante || "",
-        observacoes: dados.observacoes || "",
-        ativa: dados.ativa !== false,
-        atualizadoEm: serverTimestamp()
-      });
-    }
-
-    if (ultimaReversao.tipo === "excluir") {
-      await addDoc(collection(db, "ferramentas"), {
-        nome: dados.nome || "",
-        diametro: Number(dados.diametro || 0),
-        xd: dados.xd || "",
-        comprimento: Number(dados.comprimento || 0),
-        fabricante: dados.fabricante || "",
-        observacoes: dados.observacoes || "",
-        ativa: dados.ativa !== false,
-        criadoEm: serverTimestamp(),
-        atualizadoEm: serverTimestamp()
-      });
-    }
-
-    ultimaReversao = null;
     await carregarFerramentas();
     atualizarPainelReversao();
-
-    msgEl.innerHTML = '<div class="ok">Última alteração revertida com sucesso.</div>';
-  } catch (error) {
-    console.error(error);
-    msgEl.innerHTML = `<div class="alert">Erro ao reverter: ${error.message}</div>`;
-  }
-}
-
-
-await carregarFerramentas();
   } catch (error) {
     console.error(error);
     msgEl.innerHTML = `<div class="alert">Erro ao salvar: ${error.message}</div>`;
@@ -270,6 +194,7 @@ async function carregarFerramentas() {
 }
 
 window.editarFerramenta = function(f) {
+  modoDuplicacao = false;
   idEl.value = f.id;
   nomeEl.value = f.nome || "";
   diametroEl.value = f.diametro || "";
@@ -283,6 +208,7 @@ window.editarFerramenta = function(f) {
 };
 
 window.duplicarFerramenta = function(f) {
+  modoDuplicacao = true;
   idEl.value = "";
   nomeEl.value = f.nome || "";
   diametroEl.value = f.diametro || "";
@@ -292,7 +218,7 @@ window.duplicarFerramenta = function(f) {
   ativaEl.value = String(f.ativa !== false);
   obsEl.value = f.observacoes || "";
   tituloEl.textContent = "Duplicar ferramenta";
-  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário.</div>';
+  msgEl.innerHTML = '<div class="alert">Ferramenta duplicada no formulário. Clique em Salvar para criar a cópia.</div>';
 };
 
 window.excluirFerramenta = async function(id) {
@@ -311,92 +237,7 @@ window.excluirFerramenta = async function(id) {
     }
 
     await deleteDoc(doc(db, "ferramentas", id));
-    
-function criarPainelReversao() {
-  const painel = document.createElement("section");
-  painel.className = "card";
-  painel.innerHTML = `
-    <h3>Reversão rápida</h3>
-    <p>Permite reverter a última alteração feita nesta tela enquanto a página estiver aberta.</p>
-    <button id="reverterUltimaBtn" class="secondary" disabled>Reverter última alteração</button>
-    <div id="msgReversao" style="margin-top: 10px;"></div>
-  `;
-
-  const main = document.querySelector(".main");
-  if (main) {
-    main.appendChild(painel);
-  }
-
-  document.getElementById("reverterUltimaBtn").addEventListener("click", reverterUltimaAlteracao);
-  atualizarPainelReversao();
-}
-
-function atualizarPainelReversao() {
-  const btn = document.getElementById("reverterUltimaBtn");
-  const msg = document.getElementById("msgReversao");
-
-  if (!btn || !msg) return;
-
-  if (!ultimaReversao) {
-    btn.disabled = true;
-    msg.innerHTML = "<small>Nenhuma alteração para reverter.</small>";
-    return;
-  }
-
-  btn.disabled = false;
-  const nome = ultimaReversao.dados?.nome || "ferramenta";
-  const acao = ultimaReversao.tipo === "excluir" ? "exclusão" : "edição";
-  msg.innerHTML = `<small>Última alteração disponível: ${acao} de <strong>${nome}</strong>.</small>`;
-}
-
-async function reverterUltimaAlteracao() {
-  if (!ultimaReversao) return;
-
-  if (!confirm("Deseja reverter a última alteração?")) return;
-
-  try {
-    const dados = { ...ultimaReversao.dados };
-
-    if (ultimaReversao.tipo === "editar") {
-      await updateDoc(doc(db, "ferramentas", ultimaReversao.id), {
-        nome: dados.nome || "",
-        diametro: Number(dados.diametro || 0),
-        xd: dados.xd || "",
-        comprimento: Number(dados.comprimento || 0),
-        fabricante: dados.fabricante || "",
-        observacoes: dados.observacoes || "",
-        ativa: dados.ativa !== false,
-        atualizadoEm: serverTimestamp()
-      });
-    }
-
-    if (ultimaReversao.tipo === "excluir") {
-      await addDoc(collection(db, "ferramentas"), {
-        nome: dados.nome || "",
-        diametro: Number(dados.diametro || 0),
-        xd: dados.xd || "",
-        comprimento: Number(dados.comprimento || 0),
-        fabricante: dados.fabricante || "",
-        observacoes: dados.observacoes || "",
-        ativa: dados.ativa !== false,
-        criadoEm: serverTimestamp(),
-        atualizadoEm: serverTimestamp()
-      });
-    }
-
-    ultimaReversao = null;
     await carregarFerramentas();
-    atualizarPainelReversao();
-
-    msgEl.innerHTML = '<div class="ok">Última alteração revertida com sucesso.</div>';
-  } catch (error) {
-    console.error(error);
-    msgEl.innerHTML = `<div class="alert">Erro ao reverter: ${error.message}</div>`;
-  }
-}
-
-
-await carregarFerramentas();
     atualizarPainelReversao();
   } catch (error) {
     console.error(error);
@@ -414,6 +255,7 @@ function limparFormulario(limparMsg = true) {
   ativaEl.value = "true";
   obsEl.value = "";
   tituloEl.textContent = "Adicionar ferramenta";
+  modoDuplicacao = false;
 
   if (limparMsg) {
     msgEl.innerHTML = "";
@@ -427,7 +269,6 @@ function formatarNumero(valor) {
     maximumFractionDigits: 2
   });
 }
-
 
 function criarPainelReversao() {
   const painel = document.createElement("section");
@@ -462,7 +303,13 @@ function atualizarPainelReversao() {
 
   btn.disabled = false;
   const nome = ultimaReversao.dados?.nome || "ferramenta";
-  const acao = ultimaReversao.tipo === "excluir" ? "exclusão" : "edição";
+
+  let acao = "alteração";
+  if (ultimaReversao.tipo === "editar") acao = "edição";
+  if (ultimaReversao.tipo === "excluir") acao = "exclusão";
+  if (ultimaReversao.tipo === "criar") acao = "criação";
+  if (ultimaReversao.tipo === "duplicar") acao = "duplicação";
+
   msg.innerHTML = `<small>Última alteração disponível: ${acao} de <strong>${nome}</strong>.</small>`;
 }
 
@@ -501,6 +348,10 @@ async function reverterUltimaAlteracao() {
       });
     }
 
+    if (ultimaReversao.tipo === "criar" || ultimaReversao.tipo === "duplicar") {
+      await deleteDoc(doc(db, "ferramentas", ultimaReversao.id));
+    }
+
     ultimaReversao = null;
     await carregarFerramentas();
     atualizarPainelReversao();
@@ -511,6 +362,5 @@ async function reverterUltimaAlteracao() {
     msgEl.innerHTML = `<div class="alert">Erro ao reverter: ${error.message}</div>`;
   }
 }
-
 
 await carregarFerramentas();
