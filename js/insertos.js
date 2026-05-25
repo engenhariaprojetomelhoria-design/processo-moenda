@@ -31,6 +31,31 @@ document.getElementById("limparBtn").addEventListener("click", () => limparFormu
 
 criarPainelReversao();
 
+await carregarFabricantesFerramentas();
+
+async function carregarFabricantesFerramentas() {
+  const snap = await getDocs(collection(db, "ferramentas"));
+  const fabricantes = new Set();
+
+  snap.forEach((docSnap) => {
+    const f = docSnap.data();
+    if (f.fabricante) {
+      fabricantes.add(f.fabricante.trim());
+    }
+  });
+
+  const lista = Array.from(fabricantes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  if (lista.length === 0) {
+    marcaEl.innerHTML = '<option value="">Cadastre uma ferramenta primeiro</option>';
+    return;
+  }
+
+  marcaEl.innerHTML =
+    '<option value="">Selecione o fabricante</option>' +
+    lista.map(f => `<option value="${f}">${f}</option>`).join("");
+}
+
 async function salvarInserto() {
   const marca = marcaEl.value.trim();
   const modelo = modeloEl.value.trim();
@@ -40,7 +65,7 @@ async function salvarInserto() {
   const observacoes = obsEl.value.trim();
 
   if (!marca) {
-    msgEl.innerHTML = '<div class="alert">Informe a marca do inserto.</div>';
+    msgEl.innerHTML = '<div class="alert">Selecione a marca/fabricante do inserto.</div>';
     return;
   }
 
